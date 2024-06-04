@@ -959,7 +959,7 @@ router.post('/teams/get', (req, res) => {
 
 router.post('/teams/matches', (req, res) => {
   con.query(
-    'SELECT matches.*, t1.name AS team1name, t2.name AS team2name, competitions.name as compname FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 and (matches.team1 = ? OR matches.team2 = ?) order by matches.date asc',
+    'SELECT matches.*, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 and (matches.team1 = ? OR matches.team2 = ?) order by matches.date asc',
     [req.body.teamid, req.body.teamid],
     (error, results) => {
       if (error) {
@@ -1006,7 +1006,7 @@ router.post('/teams/switch', (req, res) => {
 })
 
 router.post('/teams/create', upload.single('file'), (req, res) => {
-  const players = JSON.parse(req.body.players)
+  const players = JSON.parse(req.body.players || JSON.stringify([]))
   con.query(
     'INSERT INTO teams (name, status, competition, logo) VALUES (?,?,?,?)',
     [req.body.name, req.body.status ? 'Active' : 'Inactive', req.body.competition, req.file.path],
@@ -1062,7 +1062,7 @@ router.post('/matches/matchdays/all', (req, res) => {
       } else {
         response.matchdays = results
         con.query(
-          "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t2.name AS team2name, competitions.name as compname FROM `matches` LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where matches.competition = ? and matches.matchday = (SELECT matchday FROM `matches` where competition = ? and date >= CURDATE() order by date asc limit 1) order by matches.date asc",
+          "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname FROM `matches` LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where matches.competition = ? and matches.matchday = (SELECT matchday FROM `matches` where competition = ? and date >= CURDATE() order by date asc limit 1) order by matches.date asc",
           [comp, comp],
           (error, results2) => {
             if (error) {
@@ -1085,7 +1085,7 @@ router.post('/matches/matchdays/all', (req, res) => {
 
 router.post('/matches/matchdays/matches', (req, res) => {
   con.query(
-    "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t2.name AS team2name, competitions.name as compname FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 and matchday = ? order by matches.date asc",
+    "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 and matchday = ? order by matches.date asc",
     [req.body.matchday],
     (error, results) => {
       if (error) {
@@ -1104,7 +1104,7 @@ router.post('/matches/matchdays/matches', (req, res) => {
 router.post('/matches/all', (req, res) => {
   var searchtxt = req.body.statusfilter !== '' ? ' and matches.status = "' + req.body.statusfilter + '" ' : ''
   con.query(
-    "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t2.name AS team2name, competitions.name as compname FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 " +
+    "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 " +
       searchtxt +
       ' order by matches.date asc',
     (error, results) => {
@@ -1123,7 +1123,7 @@ router.post('/matches/all', (req, res) => {
 
 router.post('/matches/recent', (req, res) => {
   con.query(
-    "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t2.name AS team2name, competitions.name as compname FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 and matches.date >= CURDATE() order by matches.date asc limit 10",
+    "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 and matches.date >= CURDATE() order by matches.date asc limit 10",
     (error, results) => {
       if (error) {
         res.status(500).json('Une erreur est survenue: ' + error)
@@ -1140,7 +1140,7 @@ router.post('/matches/recent', (req, res) => {
 
 router.post('/matches/get', (req, res) => {
   con.query(
-    "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t2.name AS team2name, competitions.name as compname FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where matches.matchid = ?",
+    "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where matches.matchid = ?",
     [req.body.matchid],
     (error, results) => {
       if (error) {
@@ -2239,47 +2239,59 @@ router.post('/score/add', async (req, res) => {
   const { matchid, team1scorer, team2scorer, team1score, team2score } = req.body
 
   try {
-    await con.beginTransaction()
+    con.beginTransaction(async (err) => {
+      if (err) {
+        return res.status(500).json('Error starting transaction: ' + err.message)
+      }
 
-    const matchResults = await queryAsync('SELECT * FROM matches WHERE matchid = ?', [matchid])
-    if (matchResults.length === 0) {
-      await con.rollback()
-      return res.status(404).json({
-        message: 'Aucun Enregistrement Trouvé',
+      const matchResults = await queryAsync('SELECT * FROM matches WHERE matchid = ?', [matchid])
+      if (matchResults.length === 0) {
+        return con.rollback(() => {
+          res.status(404).json({
+            message: 'Aucun Enregistrement Trouvé',
+          })
+        })
+      }
+
+      const match = matchResults[0]
+
+      await queryAsync('UPDATE matches SET team1score = ?, team2score = ? WHERE matchid = ?', [
+        team1score,
+        team2score,
+        matchid,
+      ])
+      await queryAsync('DELETE FROM scorers WHERE matchid = ?', [matchid])
+
+      let values = []
+      if (team1scorer && team1scorer.length) {
+        values.push(...team1scorer.map((playerid) => [matchid, match.team1, playerid]))
+      }
+      if (team2scorer && team2scorer.length) {
+        values.push(...team2scorer.map((playerid) => [matchid, match.team2, playerid]))
+      }
+
+      if (values.length > 0) {
+        await queryAsync('INSERT INTO scorers (matchid, teamid, playerid) VALUES ?', [values])
+      }
+
+      con.commit((err) => {
+        if (err) {
+          return con.rollback(() => {
+            res.status(500).json('Error committing transaction: ' + err.message)
+          })
+        }
+
+        return res.json({
+          message: 'success',
+        })
       })
-    }
-
-    const match = matchResults[0]
-
-    await queryAsync('UPDATE matches SET team1score = ?, team2score = ? WHERE matchid = ?', [
-      team1score,
-      team2score,
-      matchid,
-    ])
-    await queryAsync('DELETE FROM scorers WHERE matchid = ?', [matchid])
-
-    let values = []
-    if (team1scorer && team1scorer.length) {
-      values.push(...team1scorer.map((playerid) => [matchid, match.team1, playerid]))
-    }
-    if (team2scorer && team2scorer.length) {
-      values.push(...team2scorer.map((playerid) => [matchid, match.team2, playerid]))
-    }
-
-    if (values.length > 0) {
-      await queryAsync('INSERT INTO scorers (matchid, teamid, playerid) VALUES ?', [values])
-    }
-
-    await con.commit()
-    res.json({
-      message: 'success',
     })
   } catch (error) {
-    await con.rollback()
-    console.error('Une erreur est survenue: ' + error)
-    res.status(500).json({
-      message: 'Une erreur est survenue',
-      error: error,
+    return con.rollback(() => {
+      res.status(404).json({
+        message: 'Une erreur est survenue',
+        error: error,
+      })
     })
   }
 })
@@ -2498,7 +2510,7 @@ router.post('/reports/matchdays/all', (req, res) => {
       } else {
         response.matchdays = results
         con.query(
-          "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t2.name AS team2name, competitions.name as compname FROM `matches` LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where matches.competition = ? and matches.matchday = (SELECT matchday FROM `matches` where competition = ? and date >= CURDATE() order by date asc limit 1) order by matches.date asc",
+          "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname FROM `matches` LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where matches.competition = ? and matches.matchday = (SELECT matchday FROM `matches` where competition = ? and date >= CURDATE() order by date asc limit 1) order by matches.date asc",
           [comp, comp],
           (error, results2) => {
             if (error) {
@@ -2521,7 +2533,7 @@ router.post('/reports/matchdays/all', (req, res) => {
 
 router.post('/reports/matchdays/matches', (req, res) => {
   con.query(
-    "SELECT matches.*, (select count(DISTINCT(link)) from matchlinks where matchlinks.matchid = matches.matchid) as totallinks, (select count(DISTINCT(link)) from matchlinks where matchlinks.matchid = matches.matchid and type = 'Live') as livelinks, (select count(DISTINCT(link)) from matchlinks where matchlinks.matchid = matches.matchid and type = 'Highlight') as highlightlinks, (select count(DISTINCT(link)) from matchlinks where matchlinks.matchid = matches.matchid and type = 'Google') as googlelinks, (select SUM(spectators) from matchspectators where matchspectators.matchid = matches.matchid) as totalspectators, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t2.name AS team2name, competitions.name as compname FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 and matchday = ? and matches.competition = ? order by matches.date asc",
+    "SELECT matches.*, (select count(DISTINCT(link)) from matchlinks where matchlinks.matchid = matches.matchid) as totallinks, (select count(DISTINCT(link)) from matchlinks where matchlinks.matchid = matches.matchid and type = 'Live') as livelinks, (select count(DISTINCT(link)) from matchlinks where matchlinks.matchid = matches.matchid and type = 'Highlight') as highlightlinks, (select count(DISTINCT(link)) from matchlinks where matchlinks.matchid = matches.matchid and type = 'Google') as googlelinks, (select SUM(spectators) from matchspectators where matchspectators.matchid = matches.matchid) as totalspectators, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 and matchday = ? and matches.competition = ? order by matches.date asc",
     [req.body.matchday, req.body.competition],
     (error, results) => {
       if (error) {
