@@ -1731,10 +1731,10 @@ router.post('/matchdaydata/update', (req, res) => {
       matchday,
       competition,
       platform,
-      rate,
+      rate || 0,
       highlightRates[platform] || 0,
-      closureTimes[platform],
-      highlightTimes[platform],
+      closureTimes[platform] || '-',
+      highlightTimes[platform] || '-',
       currentYear,
     ])
 
