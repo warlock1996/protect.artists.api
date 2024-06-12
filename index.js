@@ -1732,7 +1732,7 @@ router.post('/matchdaydata/update', (req, res) => {
       competition,
       platform,
       rate,
-      highlightRates[platform],
+      highlightRates[platform] || 0,
       closureTimes[platform],
       highlightTimes[platform],
       currentYear,
