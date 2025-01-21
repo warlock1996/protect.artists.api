@@ -303,7 +303,7 @@ router.post('/user/updatepassword', async (req, res) => {
         console.error('Une erreur est survenue:' + error)
       } else {
         if (results.length > 0) {
-          bcrypt.compare(req.body.newpassword, results[0].password, (error, result) => {
+          bcrypt.compare(req.body.oldpassword, results[0].password, (error, result) => {
             if (error) {
               res.status(500).json('Error verifying password: ' + error)
               console.error('Error verifying password: ' + error)
@@ -324,7 +324,7 @@ router.post('/user/updatepassword', async (req, res) => {
               )
             } else {
               res.json({
-                message: 'Ancien mot de passe incorrect',
+                message: 'Old password incorrect',
               })
             }
           })
