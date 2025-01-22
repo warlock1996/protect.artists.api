@@ -913,11 +913,6 @@ router.post('/admins/delete', (req, res) => {
 /* Teams */
 router.post('/teams/all', (req, res) => {
   var comp = req.body.comp
-  if (comp == 'Ligue 1') {
-    comp = 1
-  } else if (comp == 'Ligue 2') {
-    comp = 2
-  }
   var searchtxt = comp !== '' ? ' and competitions.id = "' + comp + '" ' : ''
   con.query(
     'select teams.*, competitions.name as compname, competitions.logo as complogo from teams LEFT JOIN competitions ON teams.competition = competitions.id where 1 ' +
@@ -2325,7 +2320,7 @@ router.post('/score/teamscorers', (req, res) => {
 /* Overview */
 
 router.post('/overview/all', (req, res) => {
-  var competition = req.body.competition === 'Ligue 1' ? 1 : req.body.competition === 'Ligue 2' ? 2 : ''
+  var competition = req.body.competition
   var dateFilter = ''
   if (req.body.date.startDate && req.body.date.endDate) {
     dateFilter = " AND matches.date BETWEEN '" + req.body.date.startDate + "' AND '" + req.body.date.endDate + "' "
@@ -2353,7 +2348,7 @@ router.post('/overview/all', (req, res) => {
 })
 
 router.post('/overview/stats', (req, res) => {
-  const competition = req.body.competition === 'Ligue 1' ? 1 : req.body.competition === 'Ligue 2' ? 2 : ''
+  const competition = req.body.competition
   const team = req.body.team
   let dateFilter = ''
   if (req.body.date.startDate && req.body.date.endDate) {
@@ -2415,7 +2410,7 @@ router.post('/overview/stats', (req, res) => {
 
 router.post('/overview/domain', async (req, res) => {
   try {
-    var competition = req.body.competition === 'Ligue 1' ? 1 : req.body.competition === 'Ligue 2' ? 2 : ''
+    var competition = req.body.competition
     var team = req.body.team
     var dateFilter = ''
 
