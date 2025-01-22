@@ -959,7 +959,7 @@ router.post('/teams/get', (req, res) => {
 
 router.post('/teams/matches', (req, res) => {
   con.query(
-    'SELECT matches.*, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname, competitions.logo as complogo FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 and (matches.team1 = ? OR matches.team2 = ?) order by matches.date asc',
+    'SELECT matches.*, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname, competitions.logo as complogo, competitions.id as competitionId FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 and (matches.team1 = ? OR matches.team2 = ?) order by matches.date asc',
     [req.body.teamid, req.body.teamid],
     (error, results) => {
       if (error) {
@@ -1017,25 +1017,32 @@ router.post('/teams/create', upload.single('file'), (req, res) => {
       } else {
         if (teamResult.affectedRows) {
           const teamId = teamResult.insertId
-          for (const player of players) {
-            const playerId = crypto.randomBytes(16).toString('hex')
-            con.query(
-              'INSERT INTO players (playerid, team, name, position) VALUES (?,?,?,?)',
-              [playerId, teamId, player.name, player.position],
-              (error2, playersResult) => {
-                if (error2) {
-                  res.status(500).json('Error starting transaction: ' + error)
-                  console.error('Une erreur est survenue: ' + error)
-                } else {
-                  if (playersResult.affectedRows) {
-                    res.json({
-                      message: 'success',
-                      result: playersResult,
-                    })
+          if (players.length > 0) {
+            for (const player of players) {
+              const playerId = crypto.randomBytes(16).toString('hex')
+              con.query(
+                'INSERT INTO players (playerid, team, name, position) VALUES (?,?,?,?)',
+                [playerId, teamId, player.name, player.position],
+                (error2, playersResult) => {
+                  if (error2) {
+                    res.status(500).json('Error starting transaction: ' + error)
+                    console.error('Une erreur est survenue: ' + error)
+                  } else {
+                    if (playersResult.affectedRows) {
+                      res.json({
+                        message: 'success',
+                        result: playersResult,
+                      })
+                    }
                   }
                 }
-              }
-            )
+              )
+            }
+          } else {
+            res.json({
+              message: 'success',
+              result: teamResult,
+            })
           }
         }
       }
@@ -1046,7 +1053,7 @@ router.post('/teams/create', upload.single('file'), (req, res) => {
 
 router.post('/matches/matchdays/all', (req, res) => {
   var searchtxt = req.body.statusfilter !== '' ? ' and matches.status = "' + req.body.statusfilter + '" ' : ''
-  let comp = req.body.competition === 'Ligue 1' ? 1 : 2
+  let comp = req.body.competition
   let response = {
     matchdays: null,
     currentmatchday: null,
@@ -2032,7 +2039,7 @@ router.post('/matchlinks/delete', (req, res) => {
 router.post('/players/all', (req, res) => {
   //    var typef = req.body.type !== "" ? ' and matchlinks.type = "' + req.body.type + '" ' : "";
   con.query(
-    "SELECT * from players where team = ? order by FIELD(position, 'Forward', 'Midfielder', 'Defender', 'Goalkeeper')",
+    "SELECT * from players where team = ? order by FIELD(position, 'Striker', 'Midfielder', 'Defender', 'Goalkeeper')",
     [req.body.team],
     (error, results) => {
       if (error) {
