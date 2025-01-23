@@ -1979,7 +1979,7 @@ router.post('/matchlinks/add', (req, res) => {
     let sqlInsert = 'INSERT IGNORE  INTO matchlinks (matchid, type, link, domain) VALUES ?'
     let values = links.map((link) => {
       const parsedUrl = url.parse(link.trim())
-      let domain = parsedUrl.hostname.replace(/^www\./, '') // Remove 'www.' prefix if it exists
+      let domain = parsedUrl.hostname?.replace(/^www\./, '') // Remove 'www.' prefix if it exists
       return [matchid, type, link.trim(), domain]
     })
 
@@ -2762,7 +2762,7 @@ router.post('/competitions/all', (req, res) => {
       `SELECT c.*, t.id as team_id, t.name as team_name, t.logo as team_logo, t.status as team_status 
        FROM competitions c 
        LEFT JOIN teams t ON t.competition = c.id 
-       ORDER BY c.addedat DESC`,
+       ORDER BY c.addedat ASC`,
       (error, results) => {
         if (error) {
           res.status(500).json('Error fetching competitions and teams: ' + error)
@@ -2811,7 +2811,7 @@ router.post('/competitions/all', (req, res) => {
       }
     )
   } else {
-    con.query('select * from competitions order by addedat desc', (error, results) => {
+    con.query('select * from competitions order by addedat ASC', (error, results) => {
       if (error) {
         res.status(500).json('Error fetching competitions: ' + error)
         console.error('Error fetching competitions: ' + error)
