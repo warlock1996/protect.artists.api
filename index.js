@@ -181,14 +181,14 @@ app.get('/api', (req, res) => {
 router.post('/user/login', async (req, res) => {
   con.query('select * from users where email = ?', [req.body.email], (error, results) => {
     if (error) {
-      res.status(500).json('Une erreur est survenue:' + error)
-      console.error('Une erreur est survenue:' + error)
+      res.status(500).json('An error occurred:' + error)
+      console.error('An error occurred:' + error)
     } else {
       if (results.length > 0) {
         bcrypt.compare(req.body.password, results[0].password, (error, result) => {
           if (error) {
-            res.status(500).json('Une erreur est survenue: ' + error)
-            console.error('Une erreur est survenue: ' + error)
+            res.status(500).json('An error occurred: ' + error)
+            console.error('An error occurred: ' + error)
           } else if (result) {
             if (results[0].status === 'Active') {
               res.json({
@@ -197,24 +197,24 @@ router.post('/user/login', async (req, res) => {
               })
             } else if (results[0].status === 'Inactive') {
               res.json({
-                message: "Compte suspendu. Veuillez contacter l'administrateur.",
+                message: "Account suspended. Veuillez contacter l'administrateur.",
               })
-              console.error('Compte suspendu')
+              console.error('Account suspended')
             } else if (results[0].status === 'Email') {
               res.json({
-                message: 'Compte non vérifié. Veuillez vérifier votre courrier électronique pour vérification.',
+                message: 'Account not verified. Veuillez vérifier votre courrier électronique pour vérification.',
               })
-              console.error('Compte non vérifié')
+              console.error('Account not verified')
             }
           } else {
             res.json({
-              message: 'Aucun compte trouvé',
+              message: 'No account found',
             })
           }
         })
       } else {
         res.json({
-          message: 'Aucun compte trouvé',
+          message: 'No account found',
         })
       }
     }
@@ -224,8 +224,8 @@ router.post('/user/login', async (req, res) => {
 router.post('/user/verifysession', async (req, res) => {
   con.query('select * from users where userid = ?', [req.body.userid], (error, results) => {
     if (error) {
-      res.status(500).json('Une erreur est survenue:' + error)
-      console.error('Une erreur est survenue:' + error)
+      res.status(500).json('An error occurred:' + error)
+      console.error('An error occurred:' + error)
     } else {
       if (results.length > 0) {
         if (results[0].status === 'Active') {
@@ -235,18 +235,18 @@ router.post('/user/verifysession', async (req, res) => {
           })
         } else if (results[0].status === 'Inactive') {
           res.json({
-            message: "Compte suspendu. Veuillez contacter l'administrateur.",
+            message: "Account suspended. Veuillez contacter l'administrateur.",
           })
-          console.error('Compte suspendu')
+          console.error('Account suspended')
         } else if (results[0].status === 'Email') {
           res.json({
-            message: 'Compte non vérifié. Veuillez vérifier votre courrier électronique pour vérification.',
+            message: 'Account not verified. Veuillez vérifier votre courrier électronique pour vérification.',
           })
-          console.error('Compte non vérifié')
+          console.error('Account not verified')
         }
       } else {
         res.json({
-          message: 'Aucun compte trouvé',
+          message: 'No account found',
         })
       }
     }
@@ -256,8 +256,8 @@ router.post('/user/verifysession', async (req, res) => {
 router.post('/user/update', (req, res) => {
   con.query('select * from users where userid = ?', [req.body.userid], (error, results) => {
     if (error) {
-      res.status(500).json('Une erreur est survenue:' + error)
-      console.error('Une erreur est survenue:' + error)
+      res.status(500).json('An error occurred:' + error)
+      console.error('An error occurred:' + error)
     } else {
       if (results.length > 0) {
         if (results[0].type === 'Admin') {
@@ -269,13 +269,13 @@ router.post('/user/update', (req, res) => {
         }
         con.query(tempq, tempr, (error, results) => {
           if (error) {
-            res.status(500).json('Une erreur est survenue: ' + error)
-            console.error('Une erreur est survenue: ' + error)
+            res.status(500).json('An error occurred: ' + error)
+            console.error('An error occurred: ' + error)
           } else {
             con.query('select * from users where userid = ?', [req.body.userid], (error, results) => {
               if (error) {
-                res.status(500).json('Une erreur est survenue: ' + error)
-                console.error('Une erreur est survenue: ' + error)
+                res.status(500).json('An error occurred: ' + error)
+                console.error('An error occurred: ' + error)
               } else {
                 res.json({
                   message: 'success',
@@ -287,7 +287,7 @@ router.post('/user/update', (req, res) => {
         })
       } else {
         res.json({
-          message: 'Aucun compte trouvé',
+          message: 'No account found',
         })
       }
     }
@@ -299,8 +299,8 @@ router.post('/user/updatepassword', async (req, res) => {
   if (req.body.newpassword === req.body.confirmpassword) {
     con.query('select * from users where userid = ?', [req.body.userid], (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue:' + error)
-        console.error('Une erreur est survenue:' + error)
+        res.status(500).json('An error occurred:' + error)
+        console.error('An error occurred:' + error)
       } else {
         if (results.length > 0) {
           bcrypt.compare(req.body.oldpassword, results[0].password, (error, result) => {
@@ -313,8 +313,8 @@ router.post('/user/updatepassword', async (req, res) => {
                 [hashedPassword, req.body.userid],
                 (error, results) => {
                   if (error) {
-                    res.status(500).json('Une erreur est survenue: ' + error)
-                    console.error('Une erreur est survenue: ' + error)
+                    res.status(500).json('An error occurred: ' + error)
+                    console.error('An error occurred: ' + error)
                   } else {
                     res.json({
                       message: 'success',
@@ -330,14 +330,14 @@ router.post('/user/updatepassword', async (req, res) => {
           })
         } else {
           res.json({
-            message: 'Aucun compte trouvé',
+            message: 'No account found',
           })
         }
       }
     })
   } else {
     res.json({
-      message: 'Les mots de passe ne correspondent pas',
+      message: 'Passwords do not match',
     })
   }
 })
@@ -353,7 +353,7 @@ router.post('/user/forgotpassword', (req, res) => {
     if (err) {
       console.error('Failed to retrieve user:', err)
       res.status(500).json({
-        message: 'Erreur interne du serveur: Failed to retrieve user',
+        message: 'Internal server error: Failed to retrieve user',
       })
     } else if (results.length === 0) {
       res.json({
@@ -381,8 +381,8 @@ router.post('/user/forgotpassword', (req, res) => {
             [email, resetToken],
             (error, results) => {
               if (error) {
-                res.status(500).json('Une erreur est survenue: ' + error)
-                console.error('Une erreur est survenue: ' + error)
+                res.status(500).json('An error occurred: ' + error)
+                console.error('An error occurred: ' + error)
               } else {
                 // Send reset password email with the reset link
                 const resetLink = `https://${siteurl}/reset-password/${resetToken}`
@@ -454,7 +454,7 @@ router.get('/user/validatetoken/:token', (req, res) => {
     if (err) {
       console.error('Failed to validate reset token:', err)
       res.status(500).json({
-        message: 'Erreur interne du serveur',
+        message: 'Internal server error',
       })
     } else if (!valid) {
       res.json({
@@ -475,25 +475,25 @@ async function resetPassword(email, newpassword, confirmpassword, callback) {
     if (newpassword === confirmpassword) {
       con.query('SELECT * FROM users WHERE email = ?', [email], (error, results) => {
         if (error) {
-          console.error('Une erreur est survenue:', error)
+          console.error('An error occurred:', error)
           callback(error)
         } else {
           if (results.length > 0) {
             con.query('UPDATE users SET password = ? WHERE email = ?', [hashedPassword, email], (error, results) => {
               if (error) {
-                console.error('Une erreur est survenue:', error)
+                console.error('An error occurred:', error)
                 callback(error)
               } else {
                 callback(null)
               }
             })
           } else {
-            callback(new Error('Aucun compte trouvé'))
+            callback(new Error('No account found'))
           }
         }
       })
     } else {
-      callback(new Error('Les mots de passe ne correspondent pas'))
+      callback(new Error('Passwords do not match'))
     }
   } catch (error) {
     callback(error)
@@ -509,7 +509,7 @@ router.post('/user/resetpassword/:token', (req, res) => {
     if (err) {
       console.error('Failed to validate reset token:', err)
       res.status(500).json({
-        message: 'Erreur interne du serveur',
+        message: 'Internal server error',
       })
     } else if (!valid) {
       res.json({
@@ -521,7 +521,7 @@ router.post('/user/resetpassword/:token', (req, res) => {
         if (err) {
           console.error('Failed to reset password:', err)
           res.status(500).json({
-            message: 'Erreur interne du serveur',
+            message: 'Internal server error',
           })
         } else {
           res.json({
@@ -557,7 +557,7 @@ router.post('/user/resetpassword/:token', (req, res) => {
             .catch((error) => {
               console.error('Failed to send reset password email:', error)
               res.status(500).json({
-                message: 'Erreur interne du serveur',
+                message: 'Internal server error',
               })
             })
         }
@@ -573,8 +573,8 @@ router.post('/members/all', (req, res) => {
     "select * from users where type = 'Member' " + searchtxt + " and status <> 'Email' order by name asc",
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -591,7 +591,7 @@ router.post('/members/get', (req, res) => {
     [req.body.userid],
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
         console.error('Error executing MySQL querxy: ' + error)
       } else {
         res.json({
@@ -609,8 +609,8 @@ router.post('/members/review', (req, res) => {
     [req.body.userid],
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         if (results.length > 0) {
           const username = results[0].name
@@ -621,8 +621,8 @@ router.post('/members/review', (req, res) => {
             [req.body.reviewaction === 'Approved' ? 'Active' : req.body.reviewaction, req.body.userid],
             (error, results) => {
               if (error) {
-                res.status(500).json('Une erreur est survenue: ' + error)
-                console.error('Une erreur est survenue: ' + error)
+                res.status(500).json('An error occurred: ' + error)
+                console.error('An error occurred: ' + error)
               } else {
                 res.json({
                   message: 'success',
@@ -647,7 +647,7 @@ router.post('/members/review', (req, res) => {
           )
         } else {
           res.json({
-            message: 'requête invalide',
+            message: 'Invalid request',
           })
         }
       }
@@ -667,7 +667,7 @@ router.post('/members/add', async (req, res) => {
         [userid, req.body.name, req.body.email, hashedPassword, token, 'Active'],
         async (error, results) => {
           if (error) {
-            res.status(500).json('Une erreur est survenue: ' + error)
+            res.status(500).json('An error occurred: ' + error)
             console.error('Error executing register query: ' + error)
           } else {
             res.json({
@@ -683,14 +683,14 @@ router.post('/members/add', async (req, res) => {
               .catch((error) => {
                 console.error('Failed to new account email:', error)
                 res.status(500).json({
-                  message: 'Erreur interne du serveur',
+                  message: 'Internal server error',
                 })
               })
           }
         }
       )
     } catch (error) {
-      res.status(500).json('Une erreur est survenue: ' + error)
+      res.status(500).json('An error occurred: ' + error)
       console.error('Error executing register query: ' + error)
     }
   } else {
@@ -703,8 +703,8 @@ router.post('/members/add', async (req, res) => {
 router.post('/members/update', (req, res) => {
   con.query('select * from users where userid = ?', [req.body.userid], (error, results) => {
     if (error) {
-      res.status(500).json('Une erreur est survenue:' + error)
-      console.error('Une erreur est survenue:' + error)
+      res.status(500).json('An error occurred:' + error)
+      console.error('An error occurred:' + error)
     } else {
       if (results.length > 0) {
         con.query(
@@ -712,13 +712,13 @@ router.post('/members/update', (req, res) => {
           [req.body.name, req.body.email, req.body.status, req.body.userid],
           (error, results) => {
             if (error) {
-              res.status(500).json('Une erreur est survenue: ' + error)
-              console.error('Une erreur est survenue: ' + error)
+              res.status(500).json('An error occurred: ' + error)
+              console.error('An error occurred: ' + error)
             } else {
               con.query('select * from users where userid = ?', [req.body.userid], (error, results) => {
                 if (error) {
-                  res.status(500).json('Une erreur est survenue: ' + error)
-                  console.error('Une erreur est survenue: ' + error)
+                  res.status(500).json('An error occurred: ' + error)
+                  console.error('An error occurred: ' + error)
                 } else {
                   res.json({
                     message: 'success',
@@ -731,7 +731,7 @@ router.post('/members/update', (req, res) => {
         )
       } else {
         res.json({
-          message: 'Aucun compte trouvé',
+          message: 'No account found',
         })
       }
     }
@@ -741,14 +741,14 @@ router.post('/members/update', (req, res) => {
 router.post('/members/delete', (req, res) => {
   con.query('select * from users where userid = ?', [req.body.userid], (error, results) => {
     if (error) {
-      res.status(500).json('Une erreur est survenue:' + error)
-      console.error('Une erreur est survenue:' + error)
+      res.status(500).json('An error occurred:' + error)
+      console.error('An error occurred:' + error)
     } else {
       if (results.length > 0) {
         con.query('delete from users where userid = ?', [req.body.userid], (error, results) => {
           if (error) {
-            res.status(500).json('Une erreur est survenue: ' + error)
-            console.error('Une erreur est survenue: ' + error)
+            res.status(500).json('An error occurred: ' + error)
+            console.error('An error occurred: ' + error)
           } else {
             res.json({
               message: 'success',
@@ -757,7 +757,7 @@ router.post('/members/delete', (req, res) => {
         })
       } else {
         res.json({
-          message: 'Aucun compte trouvé',
+          message: 'No account found',
         })
       }
     }
@@ -771,8 +771,8 @@ router.post('/admins/all', (req, res) => {
     "select * from users where type = 'Admin' " + searchtxt + " and status <> 'Email' order by name asc",
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -789,7 +789,7 @@ router.post('/admins/get', (req, res) => {
     [req.body.userid],
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
         console.error('Error executing MySQL querxy: ' + error)
       } else {
         res.json({
@@ -813,7 +813,7 @@ router.post('/admins/add', async (req, res) => {
         [userid, req.body.name, req.body.email, hashedPassword, token, 'Admin', 'Active'],
         async (error, results) => {
           if (error) {
-            res.status(500).json('Une erreur est survenue: ' + error)
+            res.status(500).json('An error occurred: ' + error)
             console.error('Error executing register query: ' + error)
           } else {
             res.json({
@@ -829,14 +829,14 @@ router.post('/admins/add', async (req, res) => {
               .catch((error) => {
                 console.error('Failed to new account email:', error)
                 res.status(500).json({
-                  message: 'Erreur interne du serveur',
+                  message: 'Internal server error',
                 })
               })
           }
         }
       )
     } catch (error) {
-      res.status(500).json('Une erreur est survenue: ' + error)
+      res.status(500).json('An error occurred: ' + error)
       console.error('Error executing register query: ' + error)
     }
   } else {
@@ -849,8 +849,8 @@ router.post('/admins/add', async (req, res) => {
 router.post('/admins/update', (req, res) => {
   con.query('select * from users where userid = ?', [req.body.userid], (error, results) => {
     if (error) {
-      res.status(500).json('Une erreur est survenue:' + error)
-      console.error('Une erreur est survenue:' + error)
+      res.status(500).json('An error occurred:' + error)
+      console.error('An error occurred:' + error)
     } else {
       if (results.length > 0) {
         con.query(
@@ -858,13 +858,13 @@ router.post('/admins/update', (req, res) => {
           [req.body.name, req.body.email, req.body.status, req.body.userid],
           (error, results) => {
             if (error) {
-              res.status(500).json('Une erreur est survenue: ' + error)
-              console.error('Une erreur est survenue: ' + error)
+              res.status(500).json('An error occurred: ' + error)
+              console.error('An error occurred: ' + error)
             } else {
               con.query('select * from users where userid = ?', [req.body.userid], (error, results) => {
                 if (error) {
-                  res.status(500).json('Une erreur est survenue: ' + error)
-                  console.error('Une erreur est survenue: ' + error)
+                  res.status(500).json('An error occurred: ' + error)
+                  console.error('An error occurred: ' + error)
                 } else {
                   res.json({
                     message: 'success',
@@ -877,7 +877,7 @@ router.post('/admins/update', (req, res) => {
         )
       } else {
         res.json({
-          message: 'Aucun compte trouvé',
+          message: 'No account found',
         })
       }
     }
@@ -887,14 +887,14 @@ router.post('/admins/update', (req, res) => {
 router.post('/admins/delete', (req, res) => {
   con.query("select * from users where userid = ? where type = 'Admin'", [req.body.userid], (error, results) => {
     if (error) {
-      res.status(500).json('Une erreur est survenue:' + error)
-      console.error('Une erreur est survenue:' + error)
+      res.status(500).json('An error occurred:' + error)
+      console.error('An error occurred:' + error)
     } else {
       if (results.length > 0) {
         con.query('delete from users where userid = ?', [req.body.userid], (error, results) => {
           if (error) {
-            res.status(500).json('Une erreur est survenue: ' + error)
-            console.error('Une erreur est survenue: ' + error)
+            res.status(500).json('An error occurred: ' + error)
+            console.error('An error occurred: ' + error)
           } else {
             res.json({
               message: 'success',
@@ -903,7 +903,7 @@ router.post('/admins/delete', (req, res) => {
         })
       } else {
         res.json({
-          message: 'Aucun compte trouvé',
+          message: 'No account found',
         })
       }
     }
@@ -922,8 +922,8 @@ router.post('/teams/all', (req, res) => {
       ' teams.name asc',
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -940,8 +940,8 @@ router.post('/teams/get', (req, res) => {
     [req.body.teamid],
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -958,8 +958,8 @@ router.post('/teams/matches', (req, res) => {
     [req.body.teamid, req.body.teamid],
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -972,8 +972,8 @@ router.post('/teams/matches', (req, res) => {
 router.post('/teams/switch', (req, res) => {
   con.query('select * from teams where id = ?', [req.body.team], (error, results) => {
     if (error) {
-      res.status(500).json('Une erreur est survenue:' + error)
-      console.error('Une erreur est survenue:' + error)
+      res.status(500).json('An error occurred:' + error)
+      console.error('An error occurred:' + error)
     } else {
       if (results.length > 0) {
         con.query(
@@ -981,8 +981,8 @@ router.post('/teams/switch', (req, res) => {
           [results[0].competition == 1 ? 2 : 1, req.body.team],
           (error, results2) => {
             if (error) {
-              res.status(500).json('Une erreur est survenue: ' + error)
-              console.error('Une erreur est survenue: ' + error)
+              res.status(500).json('An error occurred: ' + error)
+              console.error('An error occurred: ' + error)
             } else {
               res.json({
                 message: 'success',
@@ -993,7 +993,7 @@ router.post('/teams/switch', (req, res) => {
         )
       } else {
         res.json({
-          message: 'Aucun Enregistrement Trouvé',
+          message: 'No record found',
         })
       }
     }
@@ -1008,7 +1008,7 @@ router.post('/teams/create', upload.single('file'), (req, res) => {
     (error, teamResult) => {
       if (error) {
         res.status(500).json('Error starting transaction: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         if (teamResult.affectedRows) {
           const teamId = teamResult.insertId
@@ -1021,7 +1021,7 @@ router.post('/teams/create', upload.single('file'), (req, res) => {
                 (error2, playersResult) => {
                   if (error2) {
                     res.status(500).json('Error starting transaction: ' + error)
-                    console.error('Une erreur est survenue: ' + error)
+                    console.error('An error occurred: ' + error)
                   } else {
                     if (playersResult.affectedRows) {
                       res.json({
@@ -1059,8 +1059,8 @@ router.post('/matches/matchdays/all', (req, res) => {
     [comp],
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         response.matchdays = results
         con.query(
@@ -1068,8 +1068,8 @@ router.post('/matches/matchdays/all', (req, res) => {
           [comp, comp],
           (error, results2) => {
             if (error) {
-              res.status(500).json('Une erreur est survenue: ' + error)
-              console.error('Une erreur est survenue: ' + error)
+              res.status(500).json('An error occurred: ' + error)
+              console.error('An error occurred: ' + error)
             } else {
               response.currentmatchdays = results2
 
@@ -1091,8 +1091,8 @@ router.post('/matches/matchdays/matches', (req, res) => {
     [req.body.matchday],
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -1111,8 +1111,8 @@ router.post('/matches/all', (req, res) => {
       ' order by matches.date asc',
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -1128,8 +1128,8 @@ router.post('/matches/recent', (req, res) => {
     "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname, competitions.logo as complogo FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 and matches.date >= CURDATE() order by matches.date asc limit 10",
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -1146,8 +1146,8 @@ router.post('/matches/get', (req, res) => {
     [req.body.matchid],
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -1175,7 +1175,7 @@ router.post('/matches/add', (req, res) => {
     (error, results) => {
       if (error) {
         res.status(500).json('Error starting transaction: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -1192,8 +1192,8 @@ router.post('/matches/review', (req, res) => {
     [req.body.matchid],
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         if (results.length > 0) {
           const username = results[0].name
@@ -1208,8 +1208,8 @@ router.post('/matches/review', (req, res) => {
             ],
             (error, results) => {
               if (error) {
-                res.status(500).json('Une erreur est survenue: ' + error)
-                console.error('Une erreur est survenue: ' + error)
+                res.status(500).json('An error occurred: ' + error)
+                console.error('An error occurred: ' + error)
               } else {
                 res.json({
                   message: 'success',
@@ -1234,7 +1234,7 @@ router.post('/matches/review', (req, res) => {
           )
         } else {
           res.json({
-            message: 'requête invalide',
+            message: 'Invalid request',
           })
         }
       }
@@ -1245,8 +1245,8 @@ router.post('/matches/review', (req, res) => {
 router.post('/matches/update', (req, res) => {
   con.query('select * from matches where matchid = ?', [req.body.matchid], (error, results) => {
     if (error) {
-      res.status(500).json('Une erreur est survenue:' + error)
-      console.error('Une erreur est survenue:' + error)
+      res.status(500).json('An error occurred:' + error)
+      console.error('An error occurred:' + error)
     } else {
       if (results.length > 0) {
         con.query(
@@ -1263,8 +1263,8 @@ router.post('/matches/update', (req, res) => {
           ],
           (error, results) => {
             if (error) {
-              res.status(500).json('Une erreur est survenue: ' + error)
-              console.error('Une erreur est survenue: ' + error)
+              res.status(500).json('An error occurred: ' + error)
+              console.error('An error occurred: ' + error)
             } else {
               res.json({
                 message: 'success',
@@ -1275,7 +1275,7 @@ router.post('/matches/update', (req, res) => {
         )
       } else {
         res.json({
-          message: 'Aucun Enregistrement Trouvé',
+          message: 'No record found',
         })
       }
     }
@@ -1285,14 +1285,14 @@ router.post('/matches/update', (req, res) => {
 router.post('/matches/delete', (req, res) => {
   con.query('select * from matches where matchid = ?', [req.body.matchid], (error, results) => {
     if (error) {
-      res.status(500).json('Une erreur est survenue:' + error)
-      console.error('Une erreur est survenue:' + error)
+      res.status(500).json('An error occurred:' + error)
+      console.error('An error occurred:' + error)
     } else {
       if (results.length > 0) {
         con.query('delete from matches where matchid = ?', [req.body.matchid], (error, results) => {
           if (error) {
-            res.status(500).json('Une erreur est survenue: ' + error)
-            console.error('Une erreur est survenue: ' + error)
+            res.status(500).json('An error occurred: ' + error)
+            console.error('An error occurred: ' + error)
           } else {
             res.json({
               message: 'success',
@@ -1301,7 +1301,7 @@ router.post('/matches/delete', (req, res) => {
         })
       } else {
         res.json({
-          message: 'Aucun Enregistrement Trouvé',
+          message: 'No record found',
         })
       }
     }
@@ -1314,8 +1314,8 @@ router.post('/matches/websites', (req, res) => {
     [req.body.matchid],
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -1332,8 +1332,8 @@ router.post('/matches/specwebsites', (req, res) => {
     [req.body.matchid],
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -1361,7 +1361,7 @@ router.post('/matches/websites/update', (req, res) => {
       con.query(query, [matchid, websiteId, count], (error) => {
         if (error) {
           return con.rollback(() => {
-            console.error('Une erreur est survenue: ' + error)
+            console.error('An error occurred: ' + error)
             res.status(500).json('Error updating data: ' + error.message)
           })
         }
@@ -1396,8 +1396,8 @@ router.post('/linkcategories/all', (req, res) => {
     [req.body.matchid, req.body.matchid, req.body.matchid, req.body.matchid],
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -1414,8 +1414,8 @@ router.post('/linkcategories/get', (req, res) => {
     [req.body.catid],
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -1430,7 +1430,7 @@ router.post('/linkcategories/add', (req, res) => {
   con.query('INSERT INTO linkcategories (name) VALUES (?)', [req.body.name], (error, results) => {
     if (error) {
       res.status(500).json('Error starting transaction: ' + error)
-      console.error('Une erreur est survenue: ' + error)
+      console.error('An error occurred: ' + error)
     } else {
       res.json({
         message: 'success',
@@ -1443,8 +1443,8 @@ router.post('/linkcategories/add', (req, res) => {
 router.post('/linkcategories/update', (req, res) => {
   con.query('select * from linkcategories where id = ?', [req.body.catid], (error, results) => {
     if (error) {
-      res.status(500).json('Une erreur est survenue:' + error)
-      console.error('Une erreur est survenue:' + error)
+      res.status(500).json('An error occurred:' + error)
+      console.error('An error occurred:' + error)
     } else {
       if (results.length > 0) {
         con.query(
@@ -1452,8 +1452,8 @@ router.post('/linkcategories/update', (req, res) => {
           [req.body.name, req.body.catid],
           (error, results) => {
             if (error) {
-              res.status(500).json('Une erreur est survenue: ' + error)
-              console.error('Une erreur est survenue: ' + error)
+              res.status(500).json('An error occurred: ' + error)
+              console.error('An error occurred: ' + error)
             } else {
               res.json({
                 message: 'success',
@@ -1464,7 +1464,7 @@ router.post('/linkcategories/update', (req, res) => {
         )
       } else {
         res.json({
-          message: 'Aucun Enregistrement Trouvé',
+          message: 'No record found',
         })
       }
     }
@@ -1474,14 +1474,14 @@ router.post('/linkcategories/update', (req, res) => {
 router.post('/linkcategories/delete', (req, res) => {
   con.query('select * from linkcategories where id = ?', [req.body.catid], (error, results) => {
     if (error) {
-      res.status(500).json('Une erreur est survenue:' + error)
-      console.error('Une erreur est survenue:' + error)
+      res.status(500).json('An error occurred:' + error)
+      console.error('An error occurred:' + error)
     } else {
       if (results.length > 0) {
         con.query('delete from linkcategories where id = ?', [req.body.catid], (error, results) => {
           if (error) {
-            res.status(500).json('Une erreur est survenue: ' + error)
-            console.error('Une erreur est survenue: ' + error)
+            res.status(500).json('An error occurred: ' + error)
+            console.error('An error occurred: ' + error)
           } else {
             res.json({
               message: 'success',
@@ -1490,7 +1490,7 @@ router.post('/linkcategories/delete', (req, res) => {
         })
       } else {
         res.json({
-          message: 'Aucun Enregistrement Trouvé',
+          message: 'No record found',
         })
       }
     }
@@ -1503,8 +1503,8 @@ router.post('/linkwebsites/all', (req, res) => {
   var typef = req.body.type !== '' ? ' and matchlinks.type = "' + req.body.type + '" ' : ''
   con.query('SELECT linkwebsites.* from linkwebsites order by linkwebsites.name asc', (error, results) => {
     if (error) {
-      res.status(500).json('Une erreur est survenue: ' + error)
-      console.error('Une erreur est survenue: ' + error)
+      res.status(500).json('An error occurred: ' + error)
+      console.error('An error occurred: ' + error)
     } else {
       res.json({
         message: 'success',
@@ -1517,8 +1517,8 @@ router.post('/linkwebsites/all', (req, res) => {
 router.post('/linkwebsites/get', (req, res) => {
   con.query('SELECT linkwebsites.* from linkwebsites where linkwebsites.id = ?', [req.body.webid], (error, results) => {
     if (error) {
-      res.status(500).json('Une erreur est survenue: ' + error)
-      console.error('Une erreur est survenue: ' + error)
+      res.status(500).json('An error occurred: ' + error)
+      console.error('An error occurred: ' + error)
     } else {
       res.json({
         message: 'success',
@@ -1532,7 +1532,7 @@ router.post('/linkwebsites/add', (req, res) => {
   con.query('INSERT INTO linkwebsites (name) VALUES (?)', [req.body.name], (error, results) => {
     if (error) {
       res.status(500).json('Error starting transaction: ' + error)
-      console.error('Une erreur est survenue: ' + error)
+      console.error('An error occurred: ' + error)
     } else {
       res.json({
         message: 'success',
@@ -1545,14 +1545,14 @@ router.post('/linkwebsites/add', (req, res) => {
 router.post('/linkwebsites/update', (req, res) => {
   con.query('select * from linkwebsites where id = ?', [req.body.webid], (error, results) => {
     if (error) {
-      res.status(500).json('Une erreur est survenue:' + error)
-      console.error('Une erreur est survenue:' + error)
+      res.status(500).json('An error occurred:' + error)
+      console.error('An error occurred:' + error)
     } else {
       if (results.length > 0) {
         con.query('update linkwebsites set link=? where id = ?', [req.body.link, req.body.webid], (error, results) => {
           if (error) {
-            res.status(500).json('Une erreur est survenue: ' + error)
-            console.error('Une erreur est survenue: ' + error)
+            res.status(500).json('An error occurred: ' + error)
+            console.error('An error occurred: ' + error)
           } else {
             res.json({
               message: 'success',
@@ -1562,7 +1562,7 @@ router.post('/linkwebsites/update', (req, res) => {
         })
       } else {
         res.json({
-          message: 'Aucun Enregistrement Trouvé',
+          message: 'No record found',
         })
       }
     }
@@ -1572,14 +1572,14 @@ router.post('/linkwebsites/update', (req, res) => {
 router.post('/linkwebsites/delete', (req, res) => {
   con.query('select * from linkwebsites where id = ?', [req.body.webid], (error, results) => {
     if (error) {
-      res.status(500).json('Une erreur est survenue:' + error)
-      console.error('Une erreur est survenue:' + error)
+      res.status(500).json('An error occurred:' + error)
+      console.error('An error occurred:' + error)
     } else {
       if (results.length > 0) {
         con.query('delete from linkwebsites where id = ?', [req.body.webid], (error, results) => {
           if (error) {
-            res.status(500).json('Une erreur est survenue: ' + error)
-            console.error('Une erreur est survenue: ' + error)
+            res.status(500).json('An error occurred: ' + error)
+            console.error('An error occurred: ' + error)
           } else {
             res.json({
               message: 'success',
@@ -1588,7 +1588,7 @@ router.post('/linkwebsites/delete', (req, res) => {
         })
       } else {
         res.json({
-          message: 'Aucun Enregistrement Trouvé',
+          message: 'No record found',
         })
       }
     }
@@ -1606,8 +1606,8 @@ router.post('/matchdaydata/all', (req, res) => {
     [currentYear, competition],
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -1625,8 +1625,8 @@ router.post('/matchdaydata/get', (req, res) => {
     [req.body.matchday, req.body.competition, currentYear],
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -1657,8 +1657,8 @@ router.post('/matchdaydata/getclosure', (req, res) => {
     ],
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -1673,7 +1673,7 @@ router.post('/matchdaydata/add', (req, res) => {
   con.query('INSERT INTO matchdaydata (name) VALUES (?)', [req.body.name], (error, results) => {
     if (error) {
       res.status(500).json('Error starting transaction: ' + error)
-      console.error('Une erreur est survenue: ' + error)
+      console.error('An error occurred: ' + error)
     } else {
       res.json({
         message: 'success',
@@ -1825,14 +1825,14 @@ router.post('/matchdaydata/update', (req, res) => {
 router.post('/matchdaydata/delete', (req, res) => {
   con.query('select * from matchdaydata where id = ?', [req.body.webid], (error, results) => {
     if (error) {
-      res.status(500).json('Une erreur est survenue:' + error)
-      console.error('Une erreur est survenue:' + error)
+      res.status(500).json('An error occurred:' + error)
+      console.error('An error occurred:' + error)
     } else {
       if (results.length > 0) {
         con.query('delete from matchdaydata where id = ?', [req.body.webid], (error, results) => {
           if (error) {
-            res.status(500).json('Une erreur est survenue: ' + error)
-            console.error('Une erreur est survenue: ' + error)
+            res.status(500).json('An error occurred: ' + error)
+            console.error('An error occurred: ' + error)
           } else {
             res.json({
               message: 'success',
@@ -1841,7 +1841,7 @@ router.post('/matchdaydata/delete', (req, res) => {
         })
       } else {
         res.json({
-          message: 'Aucun Enregistrement Trouvé',
+          message: 'No record found',
         })
       }
     }
@@ -1985,8 +1985,8 @@ router.post('/matchlinks/add', (req, res) => {
 
     con.query(sqlInsert, [values], (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
         //                res.json({
         //                    message: "success",
         //                    result: results,
@@ -2006,14 +2006,14 @@ router.post('/matchlinks/add', (req, res) => {
 router.post('/matchlinks/delete', (req, res) => {
   con.query('select * from matchlinks where id = ?', [req.body.id], (error, results) => {
     if (error) {
-      res.status(500).json('Une erreur est survenue:' + error)
-      console.error('Une erreur est survenue:' + error)
+      res.status(500).json('An error occurred:' + error)
+      console.error('An error occurred:' + error)
     } else {
       if (results.length > 0) {
         con.query('delete from matchlinks where id = ?', [req.body.id], (error, results) => {
           if (error) {
-            res.status(500).json('Une erreur est survenue: ' + error)
-            console.error('Une erreur est survenue: ' + error)
+            res.status(500).json('An error occurred: ' + error)
+            console.error('An error occurred: ' + error)
           } else {
             res.json({
               message: 'success',
@@ -2022,7 +2022,7 @@ router.post('/matchlinks/delete', (req, res) => {
         })
       } else {
         res.json({
-          message: 'Aucun Enregistrement Trouvé',
+          message: 'No record found',
         })
       }
     }
@@ -2038,8 +2038,8 @@ router.post('/players/all', (req, res) => {
     [req.body.team],
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -2053,8 +2053,8 @@ router.post('/players/all', (req, res) => {
 router.post('/players/get', (req, res) => {
   con.query('SELECT players.* from players where players.playerid = ?', [req.body.playerid], (error, results) => {
     if (error) {
-      res.status(500).json('Une erreur est survenue: ' + error)
-      console.error('Une erreur est survenue: ' + error)
+      res.status(500).json('An error occurred: ' + error)
+      console.error('An error occurred: ' + error)
     } else {
       res.json({
         message: 'success',
@@ -2067,8 +2067,8 @@ router.post('/players/get', (req, res) => {
 router.post('/players/update', (req, res) => {
   con.query('select * from players where playerid = ?', [req.body.playerid], (error, results) => {
     if (error) {
-      res.status(500).json('Une erreur est survenue:' + error)
-      console.error('Une erreur est survenue:' + error)
+      res.status(500).json('An error occurred:' + error)
+      console.error('An error occurred:' + error)
     } else {
       if (results.length > 0) {
         con.query(
@@ -2076,8 +2076,8 @@ router.post('/players/update', (req, res) => {
           [req.body.name, req.body.position, req.body.playerid],
           (error, results) => {
             if (error) {
-              res.status(500).json('Une erreur est survenue: ' + error)
-              console.error('Une erreur est survenue: ' + error)
+              res.status(500).json('An error occurred: ' + error)
+              console.error('An error occurred: ' + error)
             } else {
               res.json({
                 message: 'success',
@@ -2088,7 +2088,7 @@ router.post('/players/update', (req, res) => {
         )
       } else {
         res.json({
-          message: 'Aucun Enregistrement Trouvé',
+          message: 'No record found',
         })
       }
     }
@@ -2098,8 +2098,8 @@ router.post('/players/update', (req, res) => {
 router.post('/players/switch', (req, res) => {
   con.query('select * from players where playerid = ?', [req.body.playerid], (error, results) => {
     if (error) {
-      res.status(500).json('Une erreur est survenue:' + error)
-      console.error('Une erreur est survenue:' + error)
+      res.status(500).json('An error occurred:' + error)
+      console.error('An error occurred:' + error)
     } else {
       if (results.length > 0) {
         con.query(
@@ -2107,8 +2107,8 @@ router.post('/players/switch', (req, res) => {
           [req.body.team, req.body.playerid],
           (error, results) => {
             if (error) {
-              res.status(500).json('Une erreur est survenue: ' + error)
-              console.error('Une erreur est survenue: ' + error)
+              res.status(500).json('An error occurred: ' + error)
+              console.error('An error occurred: ' + error)
             } else {
               res.json({
                 message: 'success',
@@ -2119,7 +2119,7 @@ router.post('/players/switch', (req, res) => {
         )
       } else {
         res.json({
-          message: 'Aucun Enregistrement Trouvé',
+          message: 'No record found',
         })
       }
     }
@@ -2135,7 +2135,7 @@ router.post('/players/add', (req, res) => {
     (error, results) => {
       if (error) {
         res.status(500).json('Error starting transaction: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -2149,14 +2149,14 @@ router.post('/players/add', (req, res) => {
 router.post('/players/delete', (req, res) => {
   con.query('select * from players where playerid = ?', [req.body.playerid], (error, results) => {
     if (error) {
-      res.status(500).json('Une erreur est survenue:' + error)
-      console.error('Une erreur est survenue:' + error)
+      res.status(500).json('An error occurred:' + error)
+      console.error('An error occurred:' + error)
     } else {
       if (results.length > 0) {
         con.query('delete from players where playerid = ?', [req.body.playerid], (error, results) => {
           if (error) {
-            res.status(500).json('Une erreur est survenue: ' + error)
-            console.error('Une erreur est survenue: ' + error)
+            res.status(500).json('An error occurred: ' + error)
+            console.error('An error occurred: ' + error)
           } else {
             res.json({
               message: 'success',
@@ -2165,7 +2165,7 @@ router.post('/players/delete', (req, res) => {
         })
       } else {
         res.json({
-          message: 'Aucun Enregistrement Trouvé',
+          message: 'No record found',
         })
       }
     }
@@ -2191,27 +2191,27 @@ router.post("/score/add", (req, res) => {
 
     con.query("select * from matches where matchid = ?", [req.body.matchid], (error, results) => {
         if (error) {
-            res.status(500).json("Une erreur est survenue:" + error);
-            console.error("Une erreur est survenue:" + error);
+            res.status(500).json("An error occurred:" + error);
+            console.error("An error occurred:" + error);
         } else {
             if (results.length > 0) {
                 con.query("update matches set team1score=?,team2score=? where matchid = ?", [req.body.team1score, req.body.team2score, req.body.matchid], (error, results2) => {
                     if (error) {
-                        res.status(500).json("Une erreur est survenue: " + error);
-                        console.error("Une erreur est survenue: " + error);
+                        res.status(500).json("An error occurred: " + error);
+                        console.error("An error occurred: " + error);
                     } else {
                         con.query("delete from scorers where matchid = ?", [req.body.matchid], (error, results3) => {
                             if (error) {
-                                res.status(500).json("Une erreur est survenue: " + error);
-                                console.error("Une erreur est survenue: " + error);
+                                res.status(500).json("An error occurred: " + error);
+                                console.error("An error occurred: " + error);
                             } else {
 
                                 if (values.length > 0) {
                                     const sql = "INSERT INTO scorers (matchid, teamid, playerid) VALUES ?";
                                     con.query(sql, [values], (error, results) => {
                                         if (error) {
-                                            res.status(500).json("Une erreur est survenue: " + error);
-                                            console.error("Une erreur est survenue: " + error);
+                                            res.status(500).json("An error occurred: " + error);
+                                            console.error("An error occurred: " + error);
                                         } else {
                                             res.json({
                                                 message: "success",
@@ -2229,7 +2229,7 @@ router.post("/score/add", (req, res) => {
                 });
             } else {
                 res.json({
-                    message: "Aucun Enregistrement Trouvé",
+                    message: "No record found",
                 });
             }
         }
@@ -2250,7 +2250,7 @@ router.post('/score/add', async (req, res) => {
       if (matchResults.length === 0) {
         return con.rollback(() => {
           res.status(404).json({
-            message: 'Aucun Enregistrement Trouvé',
+            message: 'No record found',
           })
         })
       }
@@ -2291,7 +2291,7 @@ router.post('/score/add', async (req, res) => {
   } catch (error) {
     return con.rollback(() => {
       res.status(404).json({
-        message: 'Une erreur est survenue',
+        message: 'An error occurred',
         error: error,
       })
     })
@@ -2305,8 +2305,8 @@ router.post('/score/teamscorers', (req, res) => {
     [req.body.team, req.body.matchid],
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -2333,10 +2333,10 @@ router.post('/overview/all', (req, res) => {
     (error, results) => {
       if (error) {
         res.status(500).json({
-          message: 'Une erreur est survenue',
+          message: 'An error occurred',
           error,
         })
-        console.error('Une erreur est survenue: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -2395,10 +2395,10 @@ router.post('/overview/stats', (req, res) => {
   con.query(query, (error, results) => {
     if (error) {
       res.status(500).json({
-        message: 'Une erreur est survenue',
+        message: 'An error occurred',
         error,
       })
-      console.error('Une erreur est survenue: ' + error)
+      console.error('An error occurred: ' + error)
     } else {
       res.json({
         message: 'success',
@@ -2455,8 +2455,8 @@ router.post('/overview/domain', async (req, res) => {
                 totallinks DESC`,
       (error, results) => {
         if (error) {
-          res.status(500).json('Une erreur est survenue: ' + error)
-          console.error('Une erreur est survenue: ' + error)
+          res.status(500).json('An error occurred: ' + error)
+          console.error('An error occurred: ' + error)
         } else {
           res.json({
             message: 'success',
@@ -2466,8 +2466,8 @@ router.post('/overview/domain', async (req, res) => {
       }
     )
   } catch (error) {
-    console.error('Une erreur est survenue: ' + error)
-    res.status(500).json('Une erreur est survenue: ' + error)
+    console.error('An error occurred: ' + error)
+    res.status(500).json('An error occurred: ' + error)
   }
 })
 
@@ -2480,8 +2480,8 @@ router.post('/overview/match', (req, res) => {
     [req.body.matchid, req.body.matchid, req.body.matchid],
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -2507,8 +2507,8 @@ router.post('/reports/matchdays/all', (req, res) => {
     [comp],
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         response.matchdays = results
         con.query(
@@ -2516,8 +2516,8 @@ router.post('/reports/matchdays/all', (req, res) => {
           [comp, comp],
           (error, results2) => {
             if (error) {
-              res.status(500).json('Une erreur est survenue: ' + error)
-              console.error('Une erreur est survenue: ' + error)
+              res.status(500).json('An error occurred: ' + error)
+              console.error('An error occurred: ' + error)
             } else {
               response.currentmatchdays = results2
 
@@ -2539,8 +2539,8 @@ router.post('/reports/matchdays/matches', (req, res) => {
     [req.body.matchday, req.body.competition],
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -2587,8 +2587,8 @@ router.post('/reports/links/websites', (req, res) => {
     ],
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -2606,8 +2606,8 @@ router.post('/reports/matchday/data', (req, res) => {
     [req.body.matchday, req.body.competition, currentYear],
     (error, results) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         res.json({
           message: 'success',
@@ -2628,8 +2628,8 @@ router.post('/reports/matchday/totals', (req, res) => {
     [matchday, competition],
     (error, matchLinksResults) => {
       if (error) {
-        res.status(500).json('Une erreur est survenue: ' + error)
-        console.error('Une erreur est survenue: ' + error)
+        res.status(500).json('An error occurred: ' + error)
+        console.error('An error occurred: ' + error)
       } else {
         con.query(
           `
@@ -2637,8 +2637,8 @@ router.post('/reports/matchday/totals', (req, res) => {
           [matchday, competition],
           (error, spectatorsResults) => {
             if (error) {
-              res.status(500).json('Une erreur est survenue: ' + error)
-              console.error('Une erreur est survenue: ' + error)
+              res.status(500).json('An error occurred: ' + error)
+              console.error('An error occurred: ' + error)
             } else {
               con.query(
                 `
@@ -2646,8 +2646,8 @@ router.post('/reports/matchday/totals', (req, res) => {
                 [matchday, competition],
                 (error, ddlResults) => {
                   if (error) {
-                    res.status(500).json('Une erreur est survenue: ' + error)
-                    console.error('Une erreur est survenue: ' + error)
+                    res.status(500).json('An error occurred: ' + error)
+                    console.error('An error occurred: ' + error)
                   } else {
                     res.json({
                       message: 'success',
