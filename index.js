@@ -2427,12 +2427,13 @@ router.post('/overview/domain', async (req, res) => {
     // Add team links only if a team is specified
     var teamLinks =
       team !== ''
-        ? `, COUNT(DISTINCT CASE WHEN m.team1 = 1 THEN ml.id END) AS teamhomelinks,
-            COUNT(DISTINCT CASE WHEN m.team2 = 1 THEN ml.id END) AS teamawaylinks`
+        ? `, COUNT(DISTINCT CASE WHEN m.team1 = ${team} THEN ml.id END) AS teamhomelinks,
+            COUNT(DISTINCT CASE WHEN m.team2 = ${team} THEN ml.id END) AS teamawaylinks`
         : ''
 
     // Add team links joins only if a team is specified
-    var teamLinksJoins = team !== '' ? `and (m.team1 = 1 OR m.team2 = 1)` : ''
+    // var teamLinksJoins = team !== '' ? `and (m.team1 = 1 OR m.team2 = 1)` : ''
+    // ${teamLinksJoins}
 
     con.query(
       `
@@ -2448,7 +2449,6 @@ router.post('/overview/domain', async (req, res) => {
             LEFT JOIN 
                 matches m ON ml.matchid = m.matchid
             ${whereClause}
-            ${teamLinksJoins}
             GROUP BY 
                 name 
             ORDER BY 
