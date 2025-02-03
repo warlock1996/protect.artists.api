@@ -7,6 +7,7 @@ const crypto = require('crypto')
 const bcrypt = require('bcrypt')
 var mysql = require('mysql')
 const mysql2 = require('mysql2')
+const requestIp = require('request-ip')
 
 const fs = require('fs')
 const path = require('path')
@@ -38,6 +39,7 @@ const sitename = 'Protect Artists'
 const siteurl = 'protect-artists.developmint.xyz'
 
 const app = express()
+app.use(requestIp.mw())
 
 app.use('/uploads', express.static('uploads'))
 
@@ -190,6 +192,13 @@ router.post('/user/login', async (req, res) => {
             res.status(500).json('An error occurred: ' + error)
             console.error('An error occurred: ' + error)
           } else if (result) {
+            const currentTimestamp = new Date().toISOString()
+            const updateLastLogin = 'UPDATE users SET lastlogin = ?, ip = ? WHERE email = ?'
+            con.query(updateLastLogin, [currentTimestamp, req.clientIp, req.body.email], (updateError) => {
+              if (updateError) {
+                console.error('Error updating last login:', updateError)
+              }
+            })
             if (results[0].status === 'Active') {
               res.json({
                 message: 'success',
@@ -658,7 +667,7 @@ router.post('/members/review', (req, res) => {
 router.post('/members/add', async (req, res) => {
   if (req.body.password.length >= 6) {
     try {
-      const userid = crypto.randomBytes(10).toString('hex')
+      const userid = crypto.randomBytes(16).toString('hex')
       const hashedPassword = await hashPassword(req.body.password)
       const token = crypto.randomBytes(64).toString('hex')
 
