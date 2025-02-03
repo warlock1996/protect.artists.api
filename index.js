@@ -172,6 +172,23 @@ function queryAsync(sql, params) {
   })
 }
 
+function checkAuth(req, res, next) {
+  const authHeader = req.headers.authorization
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ message: 'Unauthorized - No bearer token provided' })
+  }
+
+  con.query('select * from users where token = ?', [authHeader.split(' ')[1]], (error, results) => {
+    if (error) {
+      return res.status(401).json({ message: 'Unauthorized - Invalid token' })
+    } else if (results.length === 0) {
+      return res.status(401).json({ message: 'Unauthorized - Invalid token' })
+    } else {
+      next()
+    }
+  })
+}
+
 app.get('/', (req, res) => {
   res.send('Protect Artists Server')
 })
@@ -181,159 +198,51 @@ app.get('/api', (req, res) => {
 })
 
 router.post('/user/login', async (req, res) => {
-  con.query('select * from users where email = ?', [req.body.email], (error, results) => {
-    if (error) {
-      res.status(500).json('An error occurred:' + error)
-      console.error('An error occurred:' + error)
-    } else {
-      if (results.length > 0) {
-        bcrypt.compare(req.body.password, results[0].password, (error, result) => {
-          if (error) {
-            res.status(500).json('An error occurred: ' + error)
-            console.error('An error occurred: ' + error)
-          } else if (result) {
-            const currentTimestamp = new Date().toISOString()
-            const updateLastLogin = 'UPDATE users SET lastlogin = ?, ip = ? WHERE email = ?'
-            con.query(updateLastLogin, [currentTimestamp, req.clientIp, req.body.email], (updateError) => {
-              if (updateError) {
-                console.error('Error updating last login:', updateError)
-              }
-            })
-            if (results[0].status === 'Active') {
-              res.json({
-                message: 'success',
-                userToken: results,
-              })
-            } else if (results[0].status === 'Inactive') {
-              res.json({
-                message: "Account suspended. Veuillez contacter l'administrateur.",
-              })
-              console.error('Account suspended')
-            } else if (results[0].status === 'Email') {
-              res.json({
-                message: 'Account not verified. Veuillez vérifier votre courrier électronique pour vérification.',
-              })
-              console.error('Account not verified')
-            }
-          } else {
-            res.json({
-              message: 'No account found',
-            })
-          }
-        })
-      } else {
-        res.json({
-          message: 'No account found',
-        })
-      }
-    }
-  })
-})
-
-router.post('/user/verifysession', async (req, res) => {
-  con.query('select * from users where userid = ?', [req.body.userid], (error, results) => {
-    if (error) {
-      res.status(500).json('An error occurred:' + error)
-      console.error('An error occurred:' + error)
-    } else {
-      if (results.length > 0) {
-        if (results[0].status === 'Active') {
-          res.json({
-            message: 'success',
-            userToken: results,
-          })
-        } else if (results[0].status === 'Inactive') {
-          res.json({
-            message: "Account suspended. Veuillez contacter l'administrateur.",
-          })
-          console.error('Account suspended')
-        } else if (results[0].status === 'Email') {
-          res.json({
-            message: 'Account not verified. Veuillez vérifier votre courrier électronique pour vérification.',
-          })
-          console.error('Account not verified')
-        }
-      } else {
-        res.json({
-          message: 'No account found',
-        })
-      }
-    }
-  })
-})
-
-router.post('/user/update', (req, res) => {
-  con.query('select * from users where userid = ?', [req.body.userid], (error, results) => {
-    if (error) {
-      res.status(500).json('An error occurred:' + error)
-      console.error('An error occurred:' + error)
-    } else {
-      if (results.length > 0) {
-        if (results[0].type === 'Admin') {
-          var tempq = 'update users set name=?, email=? where userid = ?'
-          var tempr = [req.body.name, req.body.email, req.body.userid]
-        } else {
-          var tempq = 'update users set name=? where userid = ?'
-          var tempr = [req.body.name, req.body.userid]
-        }
-        con.query(tempq, tempr, (error, results) => {
-          if (error) {
-            res.status(500).json('An error occurred: ' + error)
-            console.error('An error occurred: ' + error)
-          } else {
-            con.query('select * from users where userid = ?', [req.body.userid], (error, results) => {
-              if (error) {
-                res.status(500).json('An error occurred: ' + error)
-                console.error('An error occurred: ' + error)
-              } else {
-                res.json({
-                  message: 'success',
-                  userToken: results,
-                })
-              }
-            })
-          }
-        })
-      } else {
-        res.json({
-          message: 'No account found',
-        })
-      }
-    }
-  })
-})
-
-router.post('/user/updatepassword', async (req, res) => {
-  const hashedPassword = await hashPassword(req.body.newpassword)
-  if (req.body.newpassword === req.body.confirmpassword) {
-    con.query('select * from users where userid = ?', [req.body.userid], (error, results) => {
+  con.query(
+    'select id, userid, name, email, type, status, image, password from users where email = ?',
+    [req.body.email],
+    (error, results) => {
       if (error) {
         res.status(500).json('An error occurred:' + error)
         console.error('An error occurred:' + error)
       } else {
         if (results.length > 0) {
-          bcrypt.compare(req.body.oldpassword, results[0].password, (error, result) => {
+          bcrypt.compare(req.body.password, results[0].password, (error, result) => {
             if (error) {
-              res.status(500).json('Error verifying password: ' + error)
-              console.error('Error verifying password: ' + error)
+              res.status(500).json('An error occurred: ' + error)
+              console.error('An error occurred: ' + error)
             } else if (result) {
-              con.query(
-                'update users set password = ? where userid = ?',
-                [hashedPassword, req.body.userid],
-                (error, results) => {
-                  if (error) {
-                    res.status(500).json('An error occurred: ' + error)
-                    console.error('An error occurred: ' + error)
-                  } else {
-                    res.json({
-                      message: 'success',
-                    })
-                  }
+              const token = crypto.randomBytes(64).toString('hex')
+              const currentTimestamp = new Date().toISOString()
+              const updateLastLogin = 'UPDATE users SET lastlogin = ?, ip = ?, token = ? WHERE email = ?'
+              con.query(updateLastLogin, [currentTimestamp, req.clientIp, token, req.body.email], (updateError) => {
+                if (updateError) {
+                  console.error('Error updating last login:', updateError)
                 }
-              )
+              })
+
+              results[0]['token'] = token
+              delete results[0].password
+
+              if (results[0].status === 'Active') {
+                res.json({
+                  message: 'success',
+                  userToken: results,
+                })
+              } else if (results[0].status === 'Inactive') {
+                res.json({
+                  message: "Account suspended. Veuillez contacter l'administrateur.",
+                })
+                console.error('Account suspended')
+              } else if (results[0].status === 'Email') {
+                res.json({
+                  message: 'Account not verified. Veuillez vérifier votre courrier électronique pour vérification.',
+                })
+                console.error('Account not verified')
+              }
             } else {
               res.json({
-                message: 'Old password incorrect',
+                message: 'No account found',
               })
             }
           })
@@ -343,12 +252,8 @@ router.post('/user/updatepassword', async (req, res) => {
           })
         }
       }
-    })
-  } else {
-    res.json({
-      message: 'Passwords do not match',
-    })
-  }
+    }
+  )
 })
 
 router.post('/user/forgotpassword', (req, res) => {
@@ -428,6 +333,127 @@ router.post('/user/forgotpassword', (req, res) => {
       })
     }
   })
+})
+
+router.post('/user/verifysession', checkAuth, async (req, res) => {
+  con.query('select * from users where userid = ?', [req.body.userid], (error, results) => {
+    if (error) {
+      res.status(500).json('An error occurred:' + error)
+      console.error('An error occurred:' + error)
+    } else {
+      if (results.length > 0) {
+        if (results[0].status === 'Active') {
+          res.json({
+            message: 'success',
+            userToken: results,
+          })
+        } else if (results[0].status === 'Inactive') {
+          res.json({
+            message: "Account suspended. Veuillez contacter l'administrateur.",
+          })
+          console.error('Account suspended')
+        } else if (results[0].status === 'Email') {
+          res.json({
+            message: 'Account not verified. Veuillez vérifier votre courrier électronique pour vérification.',
+          })
+          console.error('Account not verified')
+        }
+      } else {
+        res.json({
+          message: 'No account found',
+        })
+      }
+    }
+  })
+})
+
+router.post('/user/update', checkAuth, (req, res) => {
+  con.query('select * from users where userid = ?', [req.body.userid], (error, results) => {
+    if (error) {
+      res.status(500).json('An error occurred:' + error)
+      console.error('An error occurred:' + error)
+    } else {
+      if (results.length > 0) {
+        if (results[0].type === 'Admin') {
+          var tempq = 'update users set name=?, email=? where userid = ?'
+          var tempr = [req.body.name, req.body.email, req.body.userid]
+        } else {
+          var tempq = 'update users set name=? where userid = ?'
+          var tempr = [req.body.name, req.body.userid]
+        }
+        con.query(tempq, tempr, (error, results) => {
+          if (error) {
+            res.status(500).json('An error occurred: ' + error)
+            console.error('An error occurred: ' + error)
+          } else {
+            con.query('select * from users where userid = ?', [req.body.userid], (error, results) => {
+              if (error) {
+                res.status(500).json('An error occurred: ' + error)
+                console.error('An error occurred: ' + error)
+              } else {
+                res.json({
+                  message: 'success',
+                  userToken: results,
+                })
+              }
+            })
+          }
+        })
+      } else {
+        res.json({
+          message: 'No account found',
+        })
+      }
+    }
+  })
+})
+
+router.post('/user/updatepassword', checkAuth, async (req, res) => {
+  const hashedPassword = await hashPassword(req.body.newpassword)
+  if (req.body.newpassword === req.body.confirmpassword) {
+    con.query('select * from users where userid = ?', [req.body.userid], (error, results) => {
+      if (error) {
+        res.status(500).json('An error occurred:' + error)
+        console.error('An error occurred:' + error)
+      } else {
+        if (results.length > 0) {
+          bcrypt.compare(req.body.oldpassword, results[0].password, (error, result) => {
+            if (error) {
+              res.status(500).json('Error verifying password: ' + error)
+              console.error('Error verifying password: ' + error)
+            } else if (result) {
+              con.query(
+                'update users set password = ? where userid = ?',
+                [hashedPassword, req.body.userid],
+                (error, results) => {
+                  if (error) {
+                    res.status(500).json('An error occurred: ' + error)
+                    console.error('An error occurred: ' + error)
+                  } else {
+                    res.json({
+                      message: 'success',
+                    })
+                  }
+                }
+              )
+            } else {
+              res.json({
+                message: 'Old password incorrect',
+              })
+            }
+          })
+        } else {
+          res.json({
+            message: 'No account found',
+          })
+        }
+      }
+    })
+  } else {
+    res.json({
+      message: 'Passwords do not match',
+    })
+  }
 })
 
 // Function to validate the reset token
@@ -576,7 +602,7 @@ router.post('/user/resetpassword/:token', (req, res) => {
 })
 
 /* Member */
-router.post('/members/all', (req, res) => {
+router.post('/members/all', checkAuth, (req, res) => {
   var searchtxt = req.body.statusfilter !== '' ? ' and status = "' + req.body.statusfilter + '" ' : ''
   con.query(
     "select * from users where type = 'Member' " + searchtxt + " and status <> 'Email' order by name asc",
@@ -594,7 +620,7 @@ router.post('/members/all', (req, res) => {
   )
 })
 
-router.post('/members/get', (req, res) => {
+router.post('/members/get', checkAuth, (req, res) => {
   con.query(
     "select * from users where type = 'Member' and status <> 'Email' and userid = ?",
     [req.body.userid],
@@ -612,7 +638,7 @@ router.post('/members/get', (req, res) => {
   )
 })
 
-router.post('/members/review', (req, res) => {
+router.post('/members/review', checkAuth, (req, res) => {
   con.query(
     "select * from users where type = 'Business' and userid = ? and status = 'Under Review'",
     [req.body.userid],
@@ -664,7 +690,7 @@ router.post('/members/review', (req, res) => {
   )
 })
 
-router.post('/members/add', async (req, res) => {
+router.post('/members/add', checkAuth, async (req, res) => {
   if (req.body.password.length >= 6) {
     try {
       const userid = crypto.randomBytes(16).toString('hex')
@@ -774,7 +800,7 @@ router.post('/members/delete', (req, res) => {
 })
 
 /* Admin */
-router.post('/admins/all', (req, res) => {
+router.post('/admins/all', checkAuth, (req, res) => {
   var searchtxt = req.body.statusfilter !== '' ? ' and status = "' + req.body.statusfilter + '" ' : ''
   con.query(
     "select * from users where type = 'Admin' " + searchtxt + " and status <> 'Email' order by name asc",
@@ -792,7 +818,7 @@ router.post('/admins/all', (req, res) => {
   )
 })
 
-router.post('/admins/get', (req, res) => {
+router.post('/admins/get', checkAuth, (req, res) => {
   con.query(
     "select * from users where type = 'Admin' and status <> 'Email' and userid = ?",
     [req.body.userid],
@@ -810,7 +836,7 @@ router.post('/admins/get', (req, res) => {
   )
 })
 
-router.post('/admins/add', async (req, res) => {
+router.post('/admins/add', checkAuth, async (req, res) => {
   if (req.body.password.length >= 6) {
     try {
       const userid = crypto.randomBytes(16).toString('hex')
@@ -855,7 +881,7 @@ router.post('/admins/add', async (req, res) => {
   }
 })
 
-router.post('/admins/update', (req, res) => {
+router.post('/admins/update', checkAuth, (req, res) => {
   con.query('select * from users where userid = ?', [req.body.userid], (error, results) => {
     if (error) {
       res.status(500).json('An error occurred:' + error)
@@ -893,7 +919,7 @@ router.post('/admins/update', (req, res) => {
   })
 })
 
-router.post('/admins/delete', (req, res) => {
+router.post('/admins/delete', checkAuth, (req, res) => {
   con.query("select * from users where userid = ? where type = 'Admin'", [req.body.userid], (error, results) => {
     if (error) {
       res.status(500).json('An error occurred:' + error)
@@ -920,7 +946,7 @@ router.post('/admins/delete', (req, res) => {
 })
 
 /* Teams */
-router.post('/teams/all', (req, res) => {
+router.post('/teams/all', checkAuth, (req, res) => {
   var comp = req.body.comp
   var searchtxt = comp !== '' ? ' and competitions.id = "' + comp + '" ' : ''
   con.query(
@@ -943,7 +969,7 @@ router.post('/teams/all', (req, res) => {
   )
 })
 
-router.post('/teams/get', (req, res) => {
+router.post('/teams/get', checkAuth, (req, res) => {
   con.query(
     "SELECT teams.*, competitions.name as compname, competitions.logo as complogo from teams LEFT JOIN competitions ON teams.competition = competitions.id where teams.id = ? and teams.status = 'Active'",
     [req.body.teamid],
@@ -961,7 +987,7 @@ router.post('/teams/get', (req, res) => {
   )
 })
 
-router.post('/teams/matches', (req, res) => {
+router.post('/teams/matches', checkAuth, (req, res) => {
   con.query(
     'SELECT matches.*, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname, competitions.logo as complogo, competitions.id as competitionId FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 and (matches.team1 = ? OR matches.team2 = ?) order by matches.date asc',
     [req.body.teamid, req.body.teamid],
@@ -978,7 +1004,8 @@ router.post('/teams/matches', (req, res) => {
     }
   )
 })
-router.post('/teams/switch', (req, res) => {
+
+router.post('/teams/switch', checkAuth, (req, res) => {
   con.query('select * from teams where id = ?', [req.body.team], (error, results) => {
     if (error) {
       res.status(500).json('An error occurred:' + error)
@@ -1009,7 +1036,7 @@ router.post('/teams/switch', (req, res) => {
   })
 })
 
-router.post('/teams/create', upload.single('file'), (req, res) => {
+router.post('/teams/create', checkAuth, upload.single('file'), (req, res) => {
   const players = JSON.parse(req.body.players || JSON.stringify([]))
   con.query(
     'INSERT INTO teams (name, status, competition, logo) VALUES (?,?,?,?)',
@@ -1055,7 +1082,7 @@ router.post('/teams/create', upload.single('file'), (req, res) => {
 })
 /* Matches */
 
-router.post('/matches/matchdays/all', (req, res) => {
+router.post('/matches/matchdays/all', checkAuth, (req, res) => {
   var searchtxt = req.body.statusfilter !== '' ? ' and matches.status = "' + req.body.statusfilter + '" ' : ''
   let comp = req.body.competition
   let response = {
@@ -1094,7 +1121,7 @@ router.post('/matches/matchdays/all', (req, res) => {
   )
 })
 
-router.post('/matches/matchdays/matches', (req, res) => {
+router.post('/matches/matchdays/matches', checkAuth, (req, res) => {
   con.query(
     "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname, competitions.logo as complogo FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 and matchday = ? order by matches.date asc",
     [req.body.matchday],
@@ -1112,7 +1139,7 @@ router.post('/matches/matchdays/matches', (req, res) => {
   )
 })
 
-router.post('/matches/all', (req, res) => {
+router.post('/matches/all', checkAuth, (req, res) => {
   var searchtxt = req.body.statusfilter !== '' ? ' and matches.status = "' + req.body.statusfilter + '" ' : ''
   con.query(
     "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname, competitions.logo as complogo FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 " +
@@ -1132,7 +1159,7 @@ router.post('/matches/all', (req, res) => {
   )
 })
 
-router.post('/matches/recent', (req, res) => {
+router.post('/matches/recent', checkAuth, (req, res) => {
   con.query(
     "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname, competitions.logo as complogo FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 and matches.date >= CURDATE() order by matches.date asc limit 10",
     (error, results) => {
@@ -1149,7 +1176,7 @@ router.post('/matches/recent', (req, res) => {
   )
 })
 
-router.post('/matches/get', (req, res) => {
+router.post('/matches/get', checkAuth, (req, res) => {
   con.query(
     "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname, competitions.logo as complogo FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where matches.matchid = ?",
     [req.body.matchid],
@@ -1167,7 +1194,7 @@ router.post('/matches/get', (req, res) => {
   )
 })
 
-router.post('/matches/add', (req, res) => {
+router.post('/matches/add', checkAuth, (req, res) => {
   const matchid = crypto.randomBytes(10).toString('hex')
   con.query(
     'INSERT INTO matches (matchid, competition, team1, team2, date, time, matchday, status) VALUES (?,?,?,?,?,?,?,?)',
@@ -1195,7 +1222,7 @@ router.post('/matches/add', (req, res) => {
   )
 })
 
-router.post('/matches/review', (req, res) => {
+router.post('/matches/review', checkAuth, (req, res) => {
   con.query(
     "select * from matches where matchid = ? and status = 'Under Review'",
     [req.body.matchid],
@@ -1251,7 +1278,7 @@ router.post('/matches/review', (req, res) => {
   )
 })
 
-router.post('/matches/update', (req, res) => {
+router.post('/matches/update', checkAuth, (req, res) => {
   con.query('select * from matches where matchid = ?', [req.body.matchid], (error, results) => {
     if (error) {
       res.status(500).json('An error occurred:' + error)
@@ -1291,7 +1318,7 @@ router.post('/matches/update', (req, res) => {
   })
 })
 
-router.post('/matches/delete', (req, res) => {
+router.post('/matches/delete', checkAuth, (req, res) => {
   con.query('select * from matches where matchid = ?', [req.body.matchid], (error, results) => {
     if (error) {
       res.status(500).json('An error occurred:' + error)
@@ -1317,7 +1344,7 @@ router.post('/matches/delete', (req, res) => {
   })
 })
 
-router.post('/matches/websites', (req, res) => {
+router.post('/matches/websites', checkAuth, (req, res) => {
   con.query(
     'SELECT linkwebsites.*, (select sum(spectators) from matchspectators where matchspectators.matchid = ? and matchspectators.website = linkwebsites.id) as totalspectators from linkwebsites',
     [req.body.matchid],
@@ -1335,7 +1362,7 @@ router.post('/matches/websites', (req, res) => {
   )
 })
 
-router.post('/matches/specwebsites', (req, res) => {
+router.post('/matches/specwebsites', checkAuth, (req, res) => {
   con.query(
     'SELECT linkwebsites.*, (select sum(spectators) from matchspectators where matchspectators.matchid = ? and matchspectators.website = linkwebsites.id) as totalspectators from linkwebsites where spectators = 1',
     [req.body.matchid],
@@ -1353,7 +1380,7 @@ router.post('/matches/specwebsites', (req, res) => {
   )
 })
 
-router.post('/matches/websites/update', (req, res) => {
+router.post('/matches/websites/update', checkAuth, (req, res) => {
   const { matchid, spectators } = req.body
 
   // Start a transaction
@@ -1396,7 +1423,7 @@ router.post('/matches/websites/update', (req, res) => {
 
 /* Link Categories */
 
-router.post('/linkcategories/all', (req, res) => {
+router.post('/linkcategories/all', checkAuth, (req, res) => {
   var typef = req.body.type !== '' ? ' and matchlinks.type = "' + req.body.type + '" ' : ''
   con.query(
     'SELECT linkcategories.*, (select count(*) from matchlinks where matchlinks.matchid = ? and matchlinks.category = linkcategories.id ' +
@@ -1417,7 +1444,7 @@ router.post('/linkcategories/all', (req, res) => {
   )
 })
 
-router.post('/linkcategories/get', (req, res) => {
+router.post('/linkcategories/get', checkAuth, (req, res) => {
   con.query(
     'SELECT linkcategories.* from linkcategories where linkcategories.id = ?',
     [req.body.catid],
@@ -1435,7 +1462,7 @@ router.post('/linkcategories/get', (req, res) => {
   )
 })
 
-router.post('/linkcategories/add', (req, res) => {
+router.post('/linkcategories/add', checkAuth, (req, res) => {
   con.query('INSERT INTO linkcategories (name) VALUES (?)', [req.body.name], (error, results) => {
     if (error) {
       res.status(500).json('Error starting transaction: ' + error)
@@ -1449,7 +1476,7 @@ router.post('/linkcategories/add', (req, res) => {
   })
 })
 
-router.post('/linkcategories/update', (req, res) => {
+router.post('/linkcategories/update', checkAuth, (req, res) => {
   con.query('select * from linkcategories where id = ?', [req.body.catid], (error, results) => {
     if (error) {
       res.status(500).json('An error occurred:' + error)
@@ -1480,7 +1507,7 @@ router.post('/linkcategories/update', (req, res) => {
   })
 })
 
-router.post('/linkcategories/delete', (req, res) => {
+router.post('/linkcategories/delete', checkAuth, (req, res) => {
   con.query('select * from linkcategories where id = ?', [req.body.catid], (error, results) => {
     if (error) {
       res.status(500).json('An error occurred:' + error)
@@ -1508,7 +1535,7 @@ router.post('/linkcategories/delete', (req, res) => {
 
 /* Websites Links */
 
-router.post('/linkwebsites/all', (req, res) => {
+router.post('/linkwebsites/all', checkAuth, (req, res) => {
   var typef = req.body.type !== '' ? ' and matchlinks.type = "' + req.body.type + '" ' : ''
   con.query('SELECT linkwebsites.* from linkwebsites order by linkwebsites.name asc', (error, results) => {
     if (error) {
@@ -1523,7 +1550,7 @@ router.post('/linkwebsites/all', (req, res) => {
   })
 })
 
-router.post('/linkwebsites/get', (req, res) => {
+router.post('/linkwebsites/get', checkAuth, (req, res) => {
   con.query('SELECT linkwebsites.* from linkwebsites where linkwebsites.id = ?', [req.body.webid], (error, results) => {
     if (error) {
       res.status(500).json('An error occurred: ' + error)
@@ -1537,7 +1564,7 @@ router.post('/linkwebsites/get', (req, res) => {
   })
 })
 
-router.post('/linkwebsites/add', (req, res) => {
+router.post('/linkwebsites/add', checkAuth, (req, res) => {
   con.query('INSERT INTO linkwebsites (name) VALUES (?)', [req.body.name], (error, results) => {
     if (error) {
       res.status(500).json('Error starting transaction: ' + error)
@@ -1551,7 +1578,7 @@ router.post('/linkwebsites/add', (req, res) => {
   })
 })
 
-router.post('/linkwebsites/update', (req, res) => {
+router.post('/linkwebsites/update', checkAuth, (req, res) => {
   con.query('select * from linkwebsites where id = ?', [req.body.webid], (error, results) => {
     if (error) {
       res.status(500).json('An error occurred:' + error)
@@ -1578,7 +1605,7 @@ router.post('/linkwebsites/update', (req, res) => {
   })
 })
 
-router.post('/linkwebsites/delete', (req, res) => {
+router.post('/linkwebsites/delete', checkAuth, (req, res) => {
   con.query('select * from linkwebsites where id = ?', [req.body.webid], (error, results) => {
     if (error) {
       res.status(500).json('An error occurred:' + error)
@@ -1606,7 +1633,7 @@ router.post('/linkwebsites/delete', (req, res) => {
 
 /* Matchday Data */
 
-router.post('/matchdaydata/all', (req, res) => {
+router.post('/matchdaydata/all', checkAuth, (req, res) => {
   const currentYear = new Date().getFullYear()
   //    var typef = req.body.type !== "" ? ' and matchlinks.type = "' + req.body.type + '" ' : "";
   var competition = req.body.competition
@@ -1627,7 +1654,7 @@ router.post('/matchdaydata/all', (req, res) => {
   )
 })
 
-router.post('/matchdaydata/get', (req, res) => {
+router.post('/matchdaydata/get', checkAuth, (req, res) => {
   const currentYear = new Date().getFullYear()
   con.query(
     'SELECT matchdaydata.* from matchdaydata where matchdaydata.matchday = ? and matchdaydata.competition = ? and matchdaydata.year = ?',
@@ -1646,7 +1673,7 @@ router.post('/matchdaydata/get', (req, res) => {
   )
 })
 
-router.post('/matchdaydata/getclosure', (req, res) => {
+router.post('/matchdaydata/getclosure', checkAuth, (req, res) => {
   const currentYear = new Date().getFullYear()
   con.query(
     'select linkwebsites.*, (select (rate) from matchdayclosure where matchdayclosure.platform = linkwebsites.id and matchdayclosure.matchday = ? and matchdayclosure.competition = ? and matchdayclosure.year = ?) as rate, (select (highlightrate) from matchdayclosure where matchdayclosure.platform = linkwebsites.id and matchdayclosure.matchday = ? and matchdayclosure.competition = ? and matchdayclosure.year = ?) as highlightrate, (select (time) from matchdayclosure where matchdayclosure.platform = linkwebsites.id and matchdayclosure.matchday = ? and matchdayclosure.competition = ? and matchdayclosure.year = ?) as time, (select (highlighttime) from matchdayclosure where matchdayclosure.platform = linkwebsites.id and matchdayclosure.matchday = ? and matchdayclosure.competition = ? and matchdayclosure.year = ?) as highlighttime from linkwebsites',
@@ -1678,7 +1705,7 @@ router.post('/matchdaydata/getclosure', (req, res) => {
   )
 })
 
-router.post('/matchdaydata/add', (req, res) => {
+router.post('/matchdaydata/add', checkAuth, (req, res) => {
   con.query('INSERT INTO matchdaydata (name) VALUES (?)', [req.body.name], (error, results) => {
     if (error) {
       res.status(500).json('Error starting transaction: ' + error)
@@ -1692,7 +1719,7 @@ router.post('/matchdaydata/add', (req, res) => {
   })
 })
 
-router.post('/matchdaydata/update', (req, res) => {
+router.post('/matchdaydata/update', checkAuth, (req, res) => {
   const {
     matchday,
     competition,
@@ -1831,7 +1858,7 @@ router.post('/matchdaydata/update', (req, res) => {
   })
 })
 
-router.post('/matchdaydata/delete', (req, res) => {
+router.post('/matchdaydata/delete', checkAuth, (req, res) => {
   con.query('select * from matchdaydata where id = ?', [req.body.webid], (error, results) => {
     if (error) {
       res.status(500).json('An error occurred:' + error)
@@ -1859,7 +1886,7 @@ router.post('/matchdaydata/delete', (req, res) => {
 
 /* Match Links */
 
-router.post('/matchlinks/all', async (req, res) => {
+router.post('/matchlinks/all', checkAuth, async (req, res) => {
   try {
     let results = {
       matchlinks: 0,
@@ -1936,7 +1963,7 @@ router.post('/matchlinks/all', async (req, res) => {
   }
 })
 
-router.post('/matchlinks/websites', async (req, res) => {
+router.post('/matchlinks/websites', checkAuth, async (req, res) => {
   try {
     let results = {
       matchlinks: 0,
@@ -1980,7 +2007,7 @@ router.post('/matchlinks/websites', async (req, res) => {
   }
 })
 
-router.post('/matchlinks/add', (req, res) => {
+router.post('/matchlinks/add', checkAuth, (req, res) => {
   let { input, matchid, type, category } = req.body
   let links = input.split('\n').filter((link) => link.trim() !== '')
 
@@ -2012,7 +2039,7 @@ router.post('/matchlinks/add', (req, res) => {
   }
 })
 
-router.post('/matchlinks/delete', (req, res) => {
+router.post('/matchlinks/delete', checkAuth, (req, res) => {
   con.query('select * from matchlinks where id = ?', [req.body.id], (error, results) => {
     if (error) {
       res.status(500).json('An error occurred:' + error)
@@ -2040,7 +2067,7 @@ router.post('/matchlinks/delete', (req, res) => {
 
 /* Players */
 
-router.post('/players/all', (req, res) => {
+router.post('/players/all', checkAuth, (req, res) => {
   //    var typef = req.body.type !== "" ? ' and matchlinks.type = "' + req.body.type + '" ' : "";
   con.query(
     "SELECT * from players where team = ? order by FIELD(position, 'Striker', 'Midfielder', 'Defender', 'Goalkeeper')",
@@ -2059,7 +2086,7 @@ router.post('/players/all', (req, res) => {
   )
 })
 
-router.post('/players/get', (req, res) => {
+router.post('/players/get', checkAuth, (req, res) => {
   con.query('SELECT players.* from players where players.playerid = ?', [req.body.playerid], (error, results) => {
     if (error) {
       res.status(500).json('An error occurred: ' + error)
@@ -2073,7 +2100,7 @@ router.post('/players/get', (req, res) => {
   })
 })
 
-router.post('/players/update', (req, res) => {
+router.post('/players/update', checkAuth, (req, res) => {
   con.query('select * from players where playerid = ?', [req.body.playerid], (error, results) => {
     if (error) {
       res.status(500).json('An error occurred:' + error)
@@ -2104,7 +2131,7 @@ router.post('/players/update', (req, res) => {
   })
 })
 
-router.post('/players/switch', (req, res) => {
+router.post('/players/switch', checkAuth, (req, res) => {
   con.query('select * from players where playerid = ?', [req.body.playerid], (error, results) => {
     if (error) {
       res.status(500).json('An error occurred:' + error)
@@ -2135,7 +2162,7 @@ router.post('/players/switch', (req, res) => {
   })
 })
 
-router.post('/players/add', (req, res) => {
+router.post('/players/add', checkAuth, (req, res) => {
   const { team, name, position } = req.body
   const playerid = crypto.randomBytes(16).toString('hex')
   con.query(
@@ -2155,7 +2182,7 @@ router.post('/players/add', (req, res) => {
   )
 })
 
-router.post('/players/delete', (req, res) => {
+router.post('/players/delete', checkAuth, (req, res) => {
   con.query('select * from players where playerid = ?', [req.body.playerid], (error, results) => {
     if (error) {
       res.status(500).json('An error occurred:' + error)
@@ -2246,7 +2273,7 @@ router.post("/score/add", (req, res) => {
 });
 */
 
-router.post('/score/add', async (req, res) => {
+router.post('/score/add', checkAuth, async (req, res) => {
   const { matchid, team1scorer, team2scorer, team1score, team2score } = req.body
 
   try {
@@ -2307,7 +2334,7 @@ router.post('/score/add', async (req, res) => {
   }
 })
 
-router.post('/score/teamscorers', (req, res) => {
+router.post('/score/teamscorers', checkAuth, (req, res) => {
   //    var typef = req.body.type !== "" ? ' and matchlinks.type = "' + req.body.type + '" ' : "";
   con.query(
     'SELECT players.name as playername, players.team as origteamid from scorers LEFT JOIN players ON scorers.playerid = players.playerid where scorers.teamid = ? and scorers.matchid = ?',
@@ -2328,7 +2355,7 @@ router.post('/score/teamscorers', (req, res) => {
 
 /* Overview */
 
-router.post('/overview/all', (req, res) => {
+router.post('/overview/all', checkAuth, (req, res) => {
   var competition = req.body.competition
   var dateFilter = ''
   if (req.body.date.startDate && req.body.date.endDate) {
@@ -2356,7 +2383,7 @@ router.post('/overview/all', (req, res) => {
   )
 })
 
-router.post('/overview/stats', (req, res) => {
+router.post('/overview/stats', checkAuth, (req, res) => {
   const competition = req.body.competition
   const team = req.body.team
   let dateFilter = ''
@@ -2417,7 +2444,7 @@ router.post('/overview/stats', (req, res) => {
   })
 })
 
-router.post('/overview/domain', async (req, res) => {
+router.post('/overview/domain', checkAuth, async (req, res) => {
   try {
     var competition = req.body.competition
     var team = req.body.team
@@ -2480,7 +2507,7 @@ router.post('/overview/domain', async (req, res) => {
   }
 })
 
-router.post('/overview/match', (req, res) => {
+router.post('/overview/match', checkAuth, (req, res) => {
   var typef = req.body.type !== '' ? ' and matchlinks.type = "' + req.body.type + '" ' : ''
   con.query(
     'SELECT linkcategories.*, (select count(DISTINCT(link)) from matchlinks where matchlinks.matchid = ? and matchlinks.category = linkcategories.id ' +
@@ -2503,7 +2530,7 @@ router.post('/overview/match', (req, res) => {
 
 /* Report */
 
-router.post('/reports/matchdays/all', (req, res) => {
+router.post('/reports/matchdays/all', checkAuth, (req, res) => {
   var searchtxt = req.body.statusfilter !== '' ? ' and matches.status = "' + req.body.statusfilter + '" ' : ''
   let comp = req.body.competition
   let response = {
@@ -2542,7 +2569,7 @@ router.post('/reports/matchdays/all', (req, res) => {
   )
 })
 
-router.post('/reports/matchdays/matches', (req, res) => {
+router.post('/reports/matchdays/matches',checkAuth, (req, res) => {
   con.query(
     "SELECT matches.*, (select count(DISTINCT(link)) from matchlinks where matchlinks.matchid = matches.matchid) as totallinks, (select count(DISTINCT(link)) from matchlinks where matchlinks.matchid = matches.matchid and type = 'Live') as livelinks, (select count(DISTINCT(link)) from matchlinks where matchlinks.matchid = matches.matchid and type = 'Highlight') as highlightlinks, (select count(DISTINCT(link)) from matchlinks where matchlinks.matchid = matches.matchid and type = 'Google') as googlelinks, (select SUM(spectators) from matchspectators where matchspectators.matchid = matches.matchid) as totalspectators, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname, competitions.logo as complogo FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 and matchday = ? and matches.competition = ? order by matches.date asc",
     [req.body.matchday, req.body.competition],
@@ -2560,7 +2587,7 @@ router.post('/reports/matchdays/matches', (req, res) => {
   )
 })
 
-router.post('/reports/links/websites', (req, res) => {
+router.post('/reports/links/websites', checkAuth,(req, res) => {
   //    con.query("SELECT lw.*, (SELECT SUM(spectators) from matchspectators LEFT JOIN matches ON matchspectators.matchid = matches.matchid where matchspectators.website = lw.id and matches.matchday = ? and matches.competition = ?) as totalspectators, (SELECT COUNT(*) FROM matchlinks ml LEFT JOIN matches m ON ml.matchid = m.matchid WHERE (ml.link LIKE CONCAT('%', TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(lw.link, ',', 1), ',', -1)), '%') OR ml.link LIKE CONCAT('%', TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(lw.link, ',', 2), ',', -1)), '%') OR ml.link LIKE CONCAT('%', TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(lw.link, ',', 3), ',', -1)), '%')) and ml.type = 'Live' and m.matchday = ? and m.competition = ?) AS livelinks, (SELECT COUNT(*) FROM matchlinks ml LEFT JOIN matches m ON ml.matchid = m.matchid WHERE (ml.link LIKE CONCAT('%', TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(lw.link, ',', 1), ',', -1)), '%') OR ml.link LIKE CONCAT('%', TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(lw.link, ',', 2), ',', -1)), '%') OR ml.link LIKE CONCAT('%', TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(lw.link, ',', 3), ',', -1)), '%')) and ml.type = 'Highlight' and m.matchday = ? and m.competition = ?) AS highlightlinks, (SELECT COUNT(*) FROM matchlinks ml LEFT JOIN matches m ON ml.matchid = m.matchid WHERE (ml.link LIKE CONCAT('%', TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(lw.link, ',', 1), ',', -1)), '%') OR ml.link LIKE CONCAT('%', TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(lw.link, ',', 2), ',', -1)), '%') OR ml.link LIKE CONCAT('%', TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(lw.link, ',', 3), ',', -1)), '%')) and ml.type = 'Google' and m.matchday = ? and m.competition = ?) AS googlelinks, (SELECT rate from matchdayclosure where matchdayclosure.matchday = ? and matchdayclosure.competition=? and matchdayclosure.platform=lw.id) as rate, (SELECT highlightrate from matchdayclosure where matchdayclosure.matchday = ? and matchdayclosure.competition=? and matchdayclosure.platform=lw.id) as highlightrate, (SELECT time from matchdayclosure where matchdayclosure.matchday = ? and matchdayclosure.competition=? and matchdayclosure.platform=lw.id) as time, (SELECT highlighttime from matchdayclosure where matchdayclosure.matchday = ? and matchdayclosure.competition=? and matchdayclosure.platform=lw.id) as highlighttime FROM linkwebsites lw where lw.spectators = 1", [req.body.matchday, req.body.competition, req.body.matchday, req.body.competition, req.body.matchday, req.body.competition, req.body.matchday, req.body.competition, req.body.matchday, req.body.competition, req.body.matchday, req.body.competition, req.body.matchday, req.body.competition, req.body.matchday, req.body.competition], (error, results) => {
   con.query(
     `SELECT lw.*, 
@@ -2608,7 +2635,7 @@ router.post('/reports/links/websites', (req, res) => {
   )
 })
 
-router.post('/reports/matchday/data', (req, res) => {
+router.post('/reports/matchday/data', checkAuth,(req, res) => {
   const currentYear = new Date().getFullYear()
   con.query(
     'SELECT matchdaydata.* from matchdaydata where matchdaydata.matchday = ? and matchdaydata.competition = ? and matchdaydata.year = ?',
@@ -2627,7 +2654,7 @@ router.post('/reports/matchday/data', (req, res) => {
   )
 })
 
-router.post('/reports/matchday/totals', (req, res) => {
+router.post('/reports/matchday/totals', checkAuth, (req, res) => {
   const currentYear = new Date().getFullYear()
   const matchday = req.body.matchday
   const competition = req.body.competition
@@ -2679,7 +2706,7 @@ router.post('/reports/matchday/totals', (req, res) => {
 
 /* Dashboard */
 
-router.post('/dashboard/stats', async (req, res) => {
+router.post('/dashboard/stats', checkAuth, async (req, res) => {
   const userId = req.body.userid
   const userType = req.body.usertype
 
@@ -2763,7 +2790,7 @@ router.post('/dashboard/stats', async (req, res) => {
 })
 
 /* Competitions */
-router.post('/competitions/all', (req, res) => {
+router.post('/competitions/all', checkAuth, (req, res) => {
   const includeTeams = req.body.includeTeams || false
 
   if (includeTeams) {
@@ -2834,7 +2861,7 @@ router.post('/competitions/all', (req, res) => {
   }
 })
 
-router.post('/competitions/create', upload.single('file'), (req, res) => {
+router.post('/competitions/create', checkAuth, upload.single('file'), (req, res) => {
   con.query(
     'INSERT INTO competitions (name, status, logo) VALUES (?,?,?)',
     [req.body.name, req.body.status ? 'Active' : 'Inactive', req.file.path],
@@ -2855,7 +2882,7 @@ router.post('/competitions/create', upload.single('file'), (req, res) => {
   )
 })
 
-router.post('/competitions/update', upload.single('file'), (req, res) => {
+router.post('/competitions/update', checkAuth, upload.single('file'), (req, res) => {
   const { id, name, status, competitionId } = req.body
 
   const updateFields = ['name = ?', 'status = ?']
@@ -2879,7 +2906,7 @@ router.post('/competitions/update', upload.single('file'), (req, res) => {
   })
 })
 
-router.post('/competitions/delete', (req, res) => {
+router.post('/competitions/delete', checkAuth, (req, res) => {
   con.query('DELETE FROM competitions WHERE id = ?', [req.body.competitionId], (error, results) => {
     if (error) {
       res.status(500).json('Error deleting competition: ' + error)
