@@ -13,6 +13,7 @@ const fs = require('fs')
 const path = require('path')
 const http = require('http')
 const multer = require('multer')
+const xlsx = require('xlsx')
 
 const socketio = require('socket.io')
 const cron = require('node-cron')
@@ -41,8 +42,7 @@ const siteurl = 'protect-artists.developmint.xyz'
 const app = express()
 app.use(requestIp.mw())
 
-app.use('/uploads', express.static('uploads'))
-
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 const port = 5000
 
 const server = http.createServer(app)
@@ -213,9 +213,9 @@ router.post('/user/login', async (req, res) => {
               console.error('An error occurred: ' + error)
             } else if (result) {
               const token = crypto.randomBytes(64).toString('hex')
-              const currentTimestamp = new Date().toISOString()
-              const updateLastLogin = 'UPDATE users SET lastlogin = ?, ip = ?, token = ? WHERE email = ?'
-              con.query(updateLastLogin, [currentTimestamp, req.clientIp, token, req.body.email], (updateError) => {
+              const currentTimestamp = new Date().toISOString().split('T')[0]
+              const updateLastLogin = 'UPDATE users SET lastlogin = ?, token = ? WHERE email = ?'
+              con.query(updateLastLogin, [currentTimestamp, token, req.body.email], (updateError) => {
                 if (updateError) {
                   console.error('Error updating last login:', updateError)
                 }
@@ -950,7 +950,7 @@ router.post('/teams/all', checkAuth, (req, res) => {
   var comp = req.body.comp
   var searchtxt = comp !== '' ? ' and competitions.id = "' + comp + '" ' : ''
   con.query(
-    'select teams.*, competitions.name as compname, competitions.logo as complogo from teams LEFT JOIN competitions ON teams.competition = competitions.id where 1 ' +
+    'select teams.*, competitions.name as compname from teams LEFT JOIN competitions ON teams.competition = competitions.id where 1 ' +
       searchtxt +
       ' order by ' +
       (req.body.comp === '' ? 'competition asc,' : '') +
@@ -971,7 +971,7 @@ router.post('/teams/all', checkAuth, (req, res) => {
 
 router.post('/teams/get', checkAuth, (req, res) => {
   con.query(
-    "SELECT teams.*, competitions.name as compname, competitions.logo as complogo from teams LEFT JOIN competitions ON teams.competition = competitions.id where teams.id = ? and teams.status = 'Active'",
+    "SELECT teams.*, competitions.name as compname from teams LEFT JOIN competitions ON teams.competition = competitions.id where teams.id = ? and teams.status = 'Active'",
     [req.body.teamid],
     (error, results) => {
       if (error) {
@@ -989,7 +989,7 @@ router.post('/teams/get', checkAuth, (req, res) => {
 
 router.post('/teams/matches', checkAuth, (req, res) => {
   con.query(
-    'SELECT matches.*, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname, competitions.logo as complogo, competitions.id as competitionId FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 and (matches.team1 = ? OR matches.team2 = ?) order by matches.date asc',
+    'SELECT matches.*, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname, competitions.id as competitionId FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 and (matches.team1 = ? OR matches.team2 = ?) order by matches.date asc',
     [req.body.teamid, req.body.teamid],
     (error, results) => {
       if (error) {
@@ -1038,9 +1038,10 @@ router.post('/teams/switch', checkAuth, (req, res) => {
 
 router.post('/teams/create', checkAuth, upload.single('file'), (req, res) => {
   const players = JSON.parse(req.body.players || JSON.stringify([]))
+  const logoPath = req.file ? req.file.path : null
   con.query(
     'INSERT INTO teams (name, status, competition, logo) VALUES (?,?,?,?)',
-    [req.body.name, req.body.status ? 'Active' : 'Inactive', req.body.competition, req.file.path],
+    [req.body.name, req.body.status ? 'Active' : 'Inactive', req.body.competition, logoPath],
     (error, teamResult) => {
       if (error) {
         res.status(500).json('Error starting transaction: ' + error)
@@ -1091,7 +1092,7 @@ router.post('/matches/matchdays/all', checkAuth, (req, res) => {
     currentmatchdays: null,
   }
   con.query(
-    'SELECT DISTINCT(matchday) as matchday from matches where competition = ? order by matchday asc',
+    'SELECT DISTINCT(matchday) as matchday from matches where competition = ? and matchday IS NOT NULL and matchday != "" and (hidden IS NULL OR hidden != 1) order by matchday asc',
     [comp],
     (error, results) => {
       if (error) {
@@ -1100,7 +1101,7 @@ router.post('/matches/matchdays/all', checkAuth, (req, res) => {
       } else {
         response.matchdays = results
         con.query(
-          "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname, competitions.logo as complogo FROM `matches` LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where matches.competition = ? and matches.matchday = (SELECT matchday FROM `matches` where competition = ? and date >= CURDATE() order by date asc limit 1) order by matches.date asc",
+          "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname FROM `matches` LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where matches.competition = ? and (matches.hidden IS NULL OR matches.hidden != 1) and matches.matchday = (SELECT matchday FROM `matches` where competition = ? and (hidden IS NULL OR hidden != 1) and date >= CURDATE() order by date asc limit 1) order by matches.date asc",
           [comp, comp],
           (error, results2) => {
             if (error) {
@@ -1123,7 +1124,7 @@ router.post('/matches/matchdays/all', checkAuth, (req, res) => {
 
 router.post('/matches/matchdays/matches', checkAuth, (req, res) => {
   con.query(
-    "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname, competitions.logo as complogo FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 and matchday = ? order by matches.date asc",
+    "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 and matchday = ? and (matches.hidden IS NULL OR matches.hidden != 1) order by matches.date asc",
     [req.body.matchday],
     (error, results) => {
       if (error) {
@@ -1139,10 +1140,41 @@ router.post('/matches/matchdays/matches', checkAuth, (req, res) => {
   )
 })
 
+// New endpoint to get distinct matchdays as array
+router.post('/matches/matchdays/distinct', checkAuth, (req, res) => {
+  const { competition } = req.body
+
+  let query =
+    'SELECT DISTINCT(matchday) as matchday FROM matches WHERE matchday IS NOT NULL AND matchday != "" AND (hidden IS NULL OR hidden != 1)'
+  let params = []
+
+  if (competition) {
+    query += ' AND competition = ?'
+    params.push(competition)
+  }
+
+  query += ' ORDER BY matchday ASC'
+
+  con.query(query, params, (error, results) => {
+    if (error) {
+      res.status(500).json('An error occurred: ' + error)
+      console.error('An error occurred: ' + error)
+    } else {
+      // Extract just the matchday values as an array
+      const matchdays = results.map((row) => row.matchday)
+
+      res.json({
+        message: 'success',
+        result: matchdays,
+      })
+    }
+  })
+})
+
 router.post('/matches/all', checkAuth, (req, res) => {
   var searchtxt = req.body.statusfilter !== '' ? ' and matches.status = "' + req.body.statusfilter + '" ' : ''
   con.query(
-    "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname, competitions.logo as complogo FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 " +
+    "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 and (matches.hidden IS NULL OR matches.hidden != 1) " +
       searchtxt +
       ' order by matches.date asc',
     (error, results) => {
@@ -1161,7 +1193,7 @@ router.post('/matches/all', checkAuth, (req, res) => {
 
 router.post('/matches/recent', checkAuth, (req, res) => {
   con.query(
-    "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname, competitions.logo as complogo FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 and matches.date >= CURDATE() order by matches.date asc limit 10",
+    "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 and (matches.hidden IS NULL OR matches.hidden != 1) and matches.date >= CURDATE() order by matches.date asc limit 10",
     (error, results) => {
       if (error) {
         res.status(500).json('An error occurred: ' + error)
@@ -1178,7 +1210,7 @@ router.post('/matches/recent', checkAuth, (req, res) => {
 
 router.post('/matches/get', checkAuth, (req, res) => {
   con.query(
-    "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname, competitions.logo as complogo FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where matches.matchid = ?",
+    "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where matches.matchid = ? and (matches.hidden IS NULL OR matches.hidden != 1)",
     [req.body.matchid],
     (error, results) => {
       if (error) {
@@ -1638,7 +1670,7 @@ router.post('/matchdaydata/all', checkAuth, (req, res) => {
   //    var typef = req.body.type !== "" ? ' and matchlinks.type = "' + req.body.type + '" ' : "";
   var competition = req.body.competition
   con.query(
-    'SELECT DISTINCT(matches.matchday) AS matchDay, matchdaydata.* FROM matches LEFT JOIN matchdaydata ON matches.matchday = matchdaydata.matchday AND matches.competition = matchdaydata.competition AND matchdaydata.year = ? WHERE matches.competition = ? ORDER BY matches.matchday ASC;',
+    'SELECT DISTINCT(matches.matchday) AS matchDay, matchdaydata.* FROM matches LEFT JOIN matchdaydata ON matches.matchday = matchdaydata.matchday AND matches.competition = matchdaydata.competition AND matchdaydata.year = ? WHERE matches.competition = ? AND matches.matchday IS NOT NULL AND matches.matchday != "" ORDER BY matches.matchday ASC;',
     [currentYear, competition],
     (error, results) => {
       if (error) {
@@ -2539,7 +2571,7 @@ router.post('/reports/matchdays/all', checkAuth, (req, res) => {
     currentmatchdays: null,
   }
   con.query(
-    'SELECT DISTINCT(matchday) as matchday from matches where competition = ? order by matchday asc',
+    'SELECT DISTINCT(matchday) as matchday from matches where competition = ? and matchday IS NOT NULL and matchday != "" and (hidden IS NULL OR hidden != 1) order by matchday asc',
     [comp],
     (error, results) => {
       if (error) {
@@ -2548,7 +2580,7 @@ router.post('/reports/matchdays/all', checkAuth, (req, res) => {
       } else {
         response.matchdays = results
         con.query(
-          "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname, competitions.logo as complogo FROM `matches` LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where matches.competition = ? and matches.matchday = (SELECT matchday FROM `matches` where competition = ? and date >= CURDATE() order by date asc limit 1) order by matches.date asc",
+          "SELECT matches.*, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname FROM `matches` LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where matches.competition = ? and (matches.hidden IS NULL OR matches.hidden != 1) and matches.matchday = (SELECT matchday FROM `matches` where competition = ? and (hidden IS NULL OR hidden != 1) and date >= CURDATE() order by date asc limit 1) order by matches.date asc",
           [comp, comp],
           (error, results2) => {
             if (error) {
@@ -2569,9 +2601,9 @@ router.post('/reports/matchdays/all', checkAuth, (req, res) => {
   )
 })
 
-router.post('/reports/matchdays/matches',checkAuth, (req, res) => {
+router.post('/reports/matchdays/matches', checkAuth, (req, res) => {
   con.query(
-    "SELECT matches.*, (select count(DISTINCT(link)) from matchlinks where matchlinks.matchid = matches.matchid) as totallinks, (select count(DISTINCT(link)) from matchlinks where matchlinks.matchid = matches.matchid and type = 'Live') as livelinks, (select count(DISTINCT(link)) from matchlinks where matchlinks.matchid = matches.matchid and type = 'Highlight') as highlightlinks, (select count(DISTINCT(link)) from matchlinks where matchlinks.matchid = matches.matchid and type = 'Google') as googlelinks, (select SUM(spectators) from matchspectators where matchspectators.matchid = matches.matchid) as totalspectators, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname, competitions.logo as complogo FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 and matchday = ? and matches.competition = ? order by matches.date asc",
+    "SELECT matches.*, (select count(DISTINCT(link)) from matchlinks where matchlinks.matchid = matches.matchid) as totallinks, (select count(DISTINCT(link)) from matchlinks where matchlinks.matchid = matches.matchid and type = 'Live') as livelinks, (select count(DISTINCT(link)) from matchlinks where matchlinks.matchid = matches.matchid and type = 'Highlight') as highlightlinks, (select count(DISTINCT(link)) from matchlinks where matchlinks.matchid = matches.matchid and type = 'Google') as googlelinks, (select SUM(spectators) from matchspectators where matchspectators.matchid = matches.matchid) as totalspectators, DATE_FORMAT(matches.addedat, '%d-%b-%Y') AS addedatdate, t1.name AS team1name, t1.logo AS team1logo, t2.name AS team2name, t2.logo AS team2logo, competitions.name as compname FROM matches LEFT JOIN teams AS t1 ON matches.team1 = t1.id LEFT JOIN teams AS t2 ON matches.team2 = t2.id LEFT JOIN competitions ON matches.competition = competitions.id where 1 and matchday = ? and matches.competition = ? and (matches.hidden IS NULL OR matches.hidden != 1) order by matches.date asc",
     [req.body.matchday, req.body.competition],
     (error, results) => {
       if (error) {
@@ -2587,7 +2619,7 @@ router.post('/reports/matchdays/matches',checkAuth, (req, res) => {
   )
 })
 
-router.post('/reports/links/websites', checkAuth,(req, res) => {
+router.post('/reports/links/websites', checkAuth, (req, res) => {
   //    con.query("SELECT lw.*, (SELECT SUM(spectators) from matchspectators LEFT JOIN matches ON matchspectators.matchid = matches.matchid where matchspectators.website = lw.id and matches.matchday = ? and matches.competition = ?) as totalspectators, (SELECT COUNT(*) FROM matchlinks ml LEFT JOIN matches m ON ml.matchid = m.matchid WHERE (ml.link LIKE CONCAT('%', TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(lw.link, ',', 1), ',', -1)), '%') OR ml.link LIKE CONCAT('%', TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(lw.link, ',', 2), ',', -1)), '%') OR ml.link LIKE CONCAT('%', TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(lw.link, ',', 3), ',', -1)), '%')) and ml.type = 'Live' and m.matchday = ? and m.competition = ?) AS livelinks, (SELECT COUNT(*) FROM matchlinks ml LEFT JOIN matches m ON ml.matchid = m.matchid WHERE (ml.link LIKE CONCAT('%', TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(lw.link, ',', 1), ',', -1)), '%') OR ml.link LIKE CONCAT('%', TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(lw.link, ',', 2), ',', -1)), '%') OR ml.link LIKE CONCAT('%', TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(lw.link, ',', 3), ',', -1)), '%')) and ml.type = 'Highlight' and m.matchday = ? and m.competition = ?) AS highlightlinks, (SELECT COUNT(*) FROM matchlinks ml LEFT JOIN matches m ON ml.matchid = m.matchid WHERE (ml.link LIKE CONCAT('%', TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(lw.link, ',', 1), ',', -1)), '%') OR ml.link LIKE CONCAT('%', TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(lw.link, ',', 2), ',', -1)), '%') OR ml.link LIKE CONCAT('%', TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(lw.link, ',', 3), ',', -1)), '%')) and ml.type = 'Google' and m.matchday = ? and m.competition = ?) AS googlelinks, (SELECT rate from matchdayclosure where matchdayclosure.matchday = ? and matchdayclosure.competition=? and matchdayclosure.platform=lw.id) as rate, (SELECT highlightrate from matchdayclosure where matchdayclosure.matchday = ? and matchdayclosure.competition=? and matchdayclosure.platform=lw.id) as highlightrate, (SELECT time from matchdayclosure where matchdayclosure.matchday = ? and matchdayclosure.competition=? and matchdayclosure.platform=lw.id) as time, (SELECT highlighttime from matchdayclosure where matchdayclosure.matchday = ? and matchdayclosure.competition=? and matchdayclosure.platform=lw.id) as highlighttime FROM linkwebsites lw where lw.spectators = 1", [req.body.matchday, req.body.competition, req.body.matchday, req.body.competition, req.body.matchday, req.body.competition, req.body.matchday, req.body.competition, req.body.matchday, req.body.competition, req.body.matchday, req.body.competition, req.body.matchday, req.body.competition, req.body.matchday, req.body.competition], (error, results) => {
   con.query(
     `SELECT lw.*, 
@@ -2635,7 +2667,7 @@ router.post('/reports/links/websites', checkAuth,(req, res) => {
   )
 })
 
-router.post('/reports/matchday/data', checkAuth,(req, res) => {
+router.post('/reports/matchday/data', checkAuth, (req, res) => {
   const currentYear = new Date().getFullYear()
   con.query(
     'SELECT matchdaydata.* from matchdaydata where matchdaydata.matchday = ? and matchdaydata.competition = ? and matchdaydata.year = ?',
@@ -2731,19 +2763,23 @@ router.post('/dashboard/stats', checkAuth, async (req, res) => {
       )
       stats.activemembers = activeMemberCount[0].count
 
-      const matchesCount = await queryAsync('SELECT count(*) as count from matches')
+      const matchesCount = await queryAsync(
+        'SELECT count(*) as count from matches where (hidden IS NULL OR hidden != 1)'
+      )
       stats.matches = matchesCount[0].count
 
-      const matchestodayCount = await queryAsync('SELECT count(*) as count from matches where date = CURDATE()')
+      const matchestodayCount = await queryAsync(
+        'SELECT count(*) as count from matches where date = CURDATE() and (hidden IS NULL OR hidden != 1)'
+      )
       stats.matchestoday = matchestodayCount[0].count
 
       const matchestomorrowCount = await queryAsync(
-        'SELECT count(*) as count from matches where date = CURDATE() + INTERVAL 1 DAY'
+        'SELECT count(*) as count from matches where date = CURDATE() + INTERVAL 1 DAY and (hidden IS NULL OR hidden != 1)'
       )
       stats.matchestomorrow = matchestomorrowCount[0].count
 
       const matchesreviewCount = await queryAsync(
-        'SELECT COUNT(*) AS count FROM matches WHERE EXISTS ( SELECT 1 FROM matchlinks WHERE matchlinks.matchid = matches.matchid )'
+        'SELECT COUNT(*) AS count FROM matches WHERE (hidden IS NULL OR hidden != 1) AND EXISTS ( SELECT 1 FROM matchlinks WHERE matchlinks.matchid = matches.matchid )'
       )
       stats.matchesreview = matchesreviewCount[0].count
 
@@ -2765,14 +2801,18 @@ router.post('/dashboard/stats', checkAuth, async (req, res) => {
         matchestomorrow: 0,
       }
 
-      const matchesCount = await queryAsync('SELECT count(*) as count from matches')
+      const matchesCount = await queryAsync(
+        'SELECT count(*) as count from matches where (hidden IS NULL OR hidden != 1)'
+      )
       stats.matches = matchesCount[0].count
 
-      const matchestodayCount = await queryAsync('SELECT count(*) as count from matches where date = CURDATE()')
+      const matchestodayCount = await queryAsync(
+        'SELECT count(*) as count from matches where date = CURDATE() and (hidden IS NULL OR hidden != 1)'
+      )
       stats.matchestoday = matchestodayCount[0].count
 
       const matchestomorrowCount = await queryAsync(
-        'SELECT count(*) as count from matches where date = CURDATE() + INTERVAL 1 DAY'
+        'SELECT count(*) as count from matches where date = CURDATE() + INTERVAL 1 DAY and (hidden IS NULL OR hidden != 1)'
       )
       stats.matchestomorrow = matchestomorrowCount[0].count
 
@@ -2814,7 +2854,6 @@ router.post('/competitions/all', checkAuth, (req, res) => {
                 id: row.id,
                 name: row.name,
                 status: row.status,
-                logo: row.logo,
                 addedat: row.addedat,
                 teams: row.team_id
                   ? [
@@ -2861,10 +2900,10 @@ router.post('/competitions/all', checkAuth, (req, res) => {
   }
 })
 
-router.post('/competitions/create', checkAuth, upload.single('file'), (req, res) => {
+router.post('/competitions/create', checkAuth, (req, res) => {
   con.query(
-    'INSERT INTO competitions (name, status, logo) VALUES (?,?,?)',
-    [req.body.name, req.body.status ? 'Active' : 'Inactive', req.file.path],
+    'INSERT INTO competitions (name, status) VALUES (?,?)',
+    [req.body.name, req.body.status ? 'Active' : 'Inactive'],
     (error, competitionResult) => {
       if (error) {
         res.status(500).json('Error starting transaction: ' + error)
@@ -2882,18 +2921,10 @@ router.post('/competitions/create', checkAuth, upload.single('file'), (req, res)
   )
 })
 
-router.post('/competitions/update', checkAuth, upload.single('file'), (req, res) => {
+router.post('/competitions/update', checkAuth, (req, res) => {
   const { id, name, status, competitionId } = req.body
 
-  const updateFields = ['name = ?', 'status = ?']
-  const updateValues = [name, status]
-  if (req.file) {
-    updateFields.push('logo = ?')
-    updateValues.push(req.file.path)
-  }
-  updateValues.push(competitionId)
-
-  con.query(`UPDATE competitions SET ${updateFields.join(', ')} WHERE id = ?`, updateValues, (error) => {
+  con.query('UPDATE competitions SET name = ?, status = ? WHERE id = ?', [name, status, competitionId], (error) => {
     if (error) {
       res.status(500).json('Error updating data: ' + error)
       console.error('Error updating data: ' + error)
@@ -2922,6 +2953,1391 @@ router.post('/competitions/delete', checkAuth, (req, res) => {
           result: results,
         })
       }
+    }
+  })
+})
+
+/* File Upload for Broadcasters and VPNs */
+router.post('/upload-file', checkAuth, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' })
+    }
+
+    const { uploadType } = req.body // 'broadcasters' or 'vpns'
+    const filePath = req.file.path
+    const fileExtension = path.extname(req.file.originalname).toLowerCase()
+
+    // Check if it's an Excel file
+    if (!['.xlsx', '.xls'].includes(fileExtension)) {
+      return res.status(400).json({ message: 'Only Excel files (.xlsx, .xls) are supported' })
+    }
+
+    // Read the Excel file
+    const workbook = xlsx.readFile(filePath)
+    const sheetName = workbook.SheetNames[0]
+    const worksheet = workbook.Sheets[sheetName]
+    const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 })
+
+    // Extract names from the first column (skip header if exists)
+    let names = []
+    if (data.length > 0) {
+      // Check if first row is a header (contains 'name' or similar)
+      const firstRow = data[0][0] ? data[0][0].toString().toLowerCase() : ''
+      const startIndex =
+        firstRow.includes('name') || firstRow.includes('vpn') || firstRow.includes('broadcaster') ? 1 : 0
+
+      names = data
+        .slice(startIndex)
+        .map((row) => row[0])
+        .filter((name) => name && name.toString().trim() !== '')
+        .map((name) => name.toString().trim())
+    }
+
+    if (names.length === 0) {
+      return res.status(400).json({ message: 'No valid data found in the file' })
+    }
+
+    // Determine table and clear existing data
+    const tableName = uploadType === 'broadcasters' ? 'broadcasters' : 'vpns'
+
+    // Clear existing data
+    await queryAsync(`DELETE FROM ${tableName}`)
+
+    // Insert new data
+    if (names.length > 0) {
+      const values = names.map((name) => [name])
+      const query = `INSERT INTO ${tableName} (name) VALUES ?`
+
+      await queryAsync(query, [values])
+    }
+
+    // Clean up uploaded file
+    fs.unlink(filePath, (err) => {
+      if (err) console.error('Error deleting uploaded file:', err)
+    })
+
+    res.json({
+      message: 'success',
+      result: {
+        uploaded: names.length,
+        type: uploadType,
+        names: names,
+      },
+    })
+  } catch (error) {
+    console.error('Error processing file upload:', error)
+    res.status(500).json({ message: 'Error processing file: ' + error.message })
+  }
+})
+
+/* Broadcasters */
+router.post('/broadcasters/get', checkAuth, (req, res) => {
+  con.query('SELECT * FROM broadcasters ORDER BY name ASC', (error, results) => {
+    if (error) {
+      res.status(500).json('Error fetching broadcasters: ' + error)
+      console.error('Error fetching broadcasters: ' + error)
+    } else {
+      res.json({
+        message: 'success',
+        result: results,
+      })
+    }
+  })
+})
+
+router.post('/broadcasters/save', checkAuth, (req, res) => {
+  const { broadcasters } = req.body
+
+  // First, clear existing broadcasters
+  con.query('DELETE FROM broadcasters', (deleteError) => {
+    if (deleteError) {
+      res.status(500).json('Error clearing broadcasters: ' + deleteError)
+      console.error('Error clearing broadcasters: ' + deleteError)
+      return
+    }
+
+    // Then insert new broadcasters
+    if (broadcasters && broadcasters.length > 0) {
+      const values = broadcasters.map((name) => [name])
+      const query = 'INSERT INTO broadcasters (name) VALUES ?'
+
+      con.query(query, [values], (insertError, results) => {
+        if (insertError) {
+          res.status(500).json('Error saving broadcasters: ' + insertError)
+          console.error('Error saving broadcasters: ' + insertError)
+        } else {
+          res.json({
+            message: 'success',
+            result: results,
+          })
+        }
+      })
+    } else {
+      res.json({
+        message: 'success',
+        result: { message: 'No broadcasters to save' },
+      })
+    }
+  })
+})
+
+router.post('/broadcasters/delete', checkAuth, (req, res) => {
+  const { id } = req.body
+
+  con.query('DELETE FROM broadcasters WHERE id = ?', [id], (error, results) => {
+    if (error) {
+      res.status(500).json('Error deleting broadcaster: ' + error)
+      console.error('Error deleting broadcaster: ' + error)
+    } else {
+      if (results.affectedRows === 0) {
+        res.status(404).json({
+          message: 'Broadcaster not found',
+        })
+      } else {
+        res.json({
+          message: 'success',
+          result: results,
+        })
+      }
+    }
+  })
+})
+
+router.post('/broadcasters/add', checkAuth, (req, res) => {
+  const { name } = req.body
+
+  con.query('INSERT INTO broadcasters (name) VALUES (?)', [name], (error, results) => {
+    if (error) {
+      res.status(500).json('Error adding broadcaster: ' + error)
+      console.error('Error adding broadcaster: ' + error)
+    } else {
+      res.json({
+        message: 'success',
+        result: {
+          id: results.insertId,
+          name: name,
+        },
+      })
+    }
+  })
+})
+
+/* VPNs */
+router.post('/vpns/get', checkAuth, (req, res) => {
+  con.query('SELECT * FROM vpns ORDER BY name ASC', (error, results) => {
+    if (error) {
+      res.status(500).json('Error fetching VPNs: ' + error)
+      console.error('Error fetching VPNs: ' + error)
+    } else {
+      res.json({
+        message: 'success',
+        result: results,
+      })
+    }
+  })
+})
+
+router.post('/vpns/save', checkAuth, (req, res) => {
+  const { vpns } = req.body
+
+  // First, clear existing VPNs
+  con.query('DELETE FROM vpns', (deleteError) => {
+    if (deleteError) {
+      res.status(500).json('Error clearing VPNs: ' + deleteError)
+      console.error('Error clearing VPNs: ' + deleteError)
+      return
+    }
+
+    // Then insert new VPNs
+    if (vpns && vpns.length > 0) {
+      const values = vpns.map((vpn) => {
+        if (typeof vpn === 'string') {
+          return [vpn, null, null] // name, description, logo_path
+        } else {
+          return [vpn.name, vpn.description || null, vpn.logo_path || null]
+        }
+      })
+      const query = 'INSERT INTO vpns (name, description, logo_path) VALUES ?'
+
+      con.query(query, [values], (insertError, results) => {
+        if (insertError) {
+          res.status(500).json('Error saving VPNs: ' + insertError)
+          console.error('Error saving VPNs: ' + insertError)
+        } else {
+          res.json({
+            message: 'success',
+            result: results,
+          })
+        }
+      })
+    } else {
+      res.json({
+        message: 'success',
+        result: { message: 'No VPNs to save' },
+      })
+    }
+  })
+})
+
+router.post('/vpns/delete', checkAuth, (req, res) => {
+  const { id } = req.body
+
+  con.query('DELETE FROM vpns WHERE id = ?', [id], (error, results) => {
+    if (error) {
+      res.status(500).json('Error deleting VPN: ' + error)
+      console.error('Error deleting VPN: ' + error)
+    } else {
+      if (results.affectedRows === 0) {
+        res.status(404).json({
+          message: 'VPN not found',
+        })
+      } else {
+        res.json({
+          message: 'success',
+          result: results,
+        })
+      }
+    }
+  })
+})
+
+router.post('/vpns/add', checkAuth, upload.single('logo'), (req, res) => {
+  const { name, description } = req.body
+  const logoPath = req.file ? req.file.path : null
+
+  con.query(
+    'INSERT INTO vpns (name, description, logo_path) VALUES (?, ?, ?)',
+    [name, description || null, logoPath],
+    (error, results) => {
+      if (error) {
+        res.status(500).json('Error adding VPN: ' + error)
+        console.error('Error adding VPN: ' + error)
+      } else {
+        res.json({
+          message: 'success',
+          result: {
+            id: results.insertId,
+            name: name,
+            description: description || null,
+            logo_path: logoPath,
+          },
+        })
+      }
+    }
+  )
+})
+
+router.post('/vpns/update', checkAuth, upload.single('logo'), (req, res) => {
+  const { vpnId, name, description } = req.body
+  const logoPath = req.file ? req.file.path : null
+
+  // First get the current VPN to check if we need to delete the old logo
+  con.query('SELECT logo_path FROM vpns WHERE id = ?', [vpnId], (error, results) => {
+    if (error) {
+      res.status(500).json('Error fetching VPN: ' + error)
+      console.error('Error fetching VPN: ' + error)
+      return
+    }
+
+    if (results.length === 0) {
+      res.status(404).json('VPN not found')
+      return
+    }
+
+    const currentLogoPath = results[0].logo_path
+
+    // If a new logo is uploaded and there's an old logo, delete the old file
+    if (logoPath && currentLogoPath) {
+      const fs = require('fs')
+      if (fs.existsSync(currentLogoPath)) {
+        fs.unlinkSync(currentLogoPath)
+      }
+    }
+
+    // Update the VPN
+    const updateQuery = logoPath
+      ? 'UPDATE vpns SET name = ?, description = ?, logo_path = ? WHERE id = ?'
+      : 'UPDATE vpns SET name = ?, description = ? WHERE id = ?'
+
+    const updateParams = logoPath ? [name, description || null, logoPath, vpnId] : [name, description || null, vpnId]
+
+    con.query(updateQuery, updateParams, (updateError, updateResults) => {
+      if (updateError) {
+        res.status(500).json('Error updating VPN: ' + updateError)
+        console.error('Error updating VPN: ' + updateError)
+      } else {
+        res.json({
+          message: 'success',
+          result: {
+            id: vpnId,
+            name: name,
+            description: description || null,
+            logo_path: logoPath || currentLogoPath,
+          },
+        })
+      }
+    })
+  })
+})
+
+/* VPN Test Data Storage */
+router.post('/vpn-tests/all', checkAuth, (req, res) => {
+  const {
+    matchday,
+    competition,
+    broadcaster,
+    vpn,
+    dateFilter,
+    countryChecked,
+    countryLocated,
+    frenchCardRegistration,
+    ligue1ContentWhileActivated,
+    testResult,
+  } = req.body
+
+  let whereConditions = ['1=1']
+  let params = []
+
+  if (matchday) {
+    whereConditions.push('matchday = ?')
+    params.push(matchday)
+  }
+
+  if (competition) {
+    whereConditions.push('competition = ?')
+    params.push(competition)
+  }
+
+  if (broadcaster) {
+    whereConditions.push('broadcaster = ?')
+    params.push(broadcaster)
+  }
+
+  if (vpn) {
+    whereConditions.push('vpn = ?')
+    params.push(vpn)
+  }
+
+  if (dateFilter && dateFilter.startDate && dateFilter.endDate) {
+    whereConditions.push('test_date BETWEEN ? AND ?')
+    params.push(dateFilter.startDate, dateFilter.endDate)
+  }
+
+  if (countryChecked) {
+    whereConditions.push('country_checked = ?')
+    params.push(countryChecked)
+  }
+
+  if (countryLocated) {
+    whereConditions.push('country_located = ?')
+    params.push(countryLocated)
+  }
+
+  if (frenchCardRegistration) {
+    whereConditions.push('french_card_registration = ?')
+    params.push(frenchCardRegistration)
+  }
+
+  if (ligue1ContentWhileActivated) {
+    whereConditions.push('ligue1_content_while_activated = ?')
+    params.push(ligue1ContentWhileActivated)
+  }
+
+  if (testResult) {
+    whereConditions.push('test_result = ?')
+    params.push(testResult)
+  }
+
+  const query = `
+    SELECT vt.*, 
+           vt.broadcaster as broadcaster_name,
+           vt.vpn as vpn_name,
+           vt.country_checked,
+           vt.country_located,
+           vt.french_card_registration,
+           vt.vpn_ip_address,
+           vt.ligue1_content_while_activated,
+           vt.ligue1_content_while_deactivated
+    FROM vpn_tests vt
+    WHERE ${whereConditions.join(' AND ')}
+    ORDER BY vt.test_date DESC
+  `
+
+  con.query(query, params, (error, results) => {
+    if (error) {
+      res.status(500).json('Error fetching VPN tests: ' + error)
+      console.error('Error fetching VPN tests: ' + error)
+    } else {
+      res.json({
+        message: 'success',
+        result: results,
+      })
+    }
+  })
+})
+
+router.post('/vpn-tests/get', checkAuth, (req, res) => {
+  con.query(
+    `SELECT vt.*, 
+            vt.broadcaster as broadcaster_name,
+            vt.vpn as vpn_name,
+            vt.country_checked,
+            vt.country_located,
+            vt.french_card_registration,
+            vt.vpn_ip_address,
+            vt.ligue1_content_while_activated,
+            vt.ligue1_content_while_deactivated
+     FROM vpn_tests vt
+     WHERE vt.id = ?`,
+    [req.body.testId],
+    (error, results) => {
+      if (error) {
+        res.status(500).json('Error fetching VPN test: ' + error)
+        console.error('Error fetching VPN test: ' + error)
+      } else {
+        res.json({
+          message: 'success',
+          result: results[0] || null,
+        })
+      }
+    }
+  )
+})
+
+router.post('/vpn-tests/add', checkAuth, upload.single('screenshot'), (req, res) => {
+  const {
+    matchday,
+    competition,
+    broadcaster,
+    vpn,
+    testResult,
+    notes,
+    testDate,
+    countryChecked,
+    countryLocated,
+    frenchCardRegistration,
+    vpnIpAddress,
+    ligue1ContentWhileActivated,
+    ligue1ContentWhileDeactivated,
+  } = req.body
+
+  const screenshotPath = req.file ? req.file.path : null
+
+  // Convert string values to integers for tinyint columns
+  const convertToTinyint = (value) => {
+    if (value === 'yes') return 1
+    if (value === 'no') return 0
+    return 0 // Default to 0 for empty string, null, or any other value
+  }
+
+  con.query(
+    `INSERT INTO vpn_tests 
+     (matchday, competition, broadcaster, vpn, test_result, notes, screenshot_path, test_date, 
+      country_checked, country_located, french_card_registration, vpn_ip_address, ligue1_content_while_activated, ligue1_content_while_deactivated) 
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      matchday,
+      competition,
+      broadcaster,
+      vpn,
+      testResult,
+      notes || '',
+      screenshotPath,
+      testDate || new Date().toISOString().slice(0, 19).replace('T', ' '),
+      countryChecked,
+      countryLocated,
+      convertToTinyint(frenchCardRegistration),
+      vpnIpAddress,
+      convertToTinyint(ligue1ContentWhileActivated),
+      convertToTinyint(ligue1ContentWhileDeactivated),
+    ],
+    (error, results) => {
+      if (error) {
+        res.status(500).json('Error adding VPN test: ' + error)
+        console.error('Error adding VPN test: ' + error)
+      } else {
+        res.json({
+          message: 'success',
+          result: {
+            id: results.insertId,
+            matchday,
+            competition,
+            broadcaster,
+            vpn,
+            testResult,
+            notes,
+            screenshotPath,
+            testDate,
+            countryChecked,
+            countryLocated,
+            frenchCardRegistration,
+            vpnIpAddress,
+            ligue1ContentWhileActivated,
+            ligue1ContentWhileDeactivated,
+          },
+        })
+      }
+    }
+  )
+})
+
+router.post('/vpn-tests/update', checkAuth, upload.single('screenshot'), (req, res) => {
+  const {
+    testId,
+    matchday,
+    competition,
+    broadcaster,
+    vpn,
+    testResult,
+    notes,
+    testDate,
+    countryChecked,
+    countryLocated,
+    frenchCardRegistration,
+    vpnIpAddress,
+    ligue1ContentWhileActivated,
+    ligue1ContentWhileDeactivated,
+  } = req.body
+
+  let screenshotPath = null
+  let updateFields = []
+  let params = []
+
+  // Convert string values to integers for tinyint columns
+  const convertToTinyint = (value) => {
+    if (value === 'yes') return 1
+    if (value === 'no') return 0
+    return 0 // Default to 0 for empty string, null, or any other value
+  }
+
+  // Build dynamic update query
+  if (matchday !== undefined) {
+    updateFields.push('matchday = ?')
+    params.push(matchday)
+  }
+  if (competition !== undefined) {
+    updateFields.push('competition = ?')
+    params.push(competition)
+  }
+  if (broadcaster !== undefined) {
+    updateFields.push('broadcaster = ?')
+    params.push(broadcaster)
+  }
+  if (vpn !== undefined) {
+    updateFields.push('vpn = ?')
+    params.push(vpn)
+  }
+  if (testResult !== undefined) {
+    updateFields.push('test_result = ?')
+    params.push(testResult)
+  }
+  if (notes !== undefined) {
+    updateFields.push('notes = ?')
+    params.push(notes)
+  }
+  if (testDate !== undefined) {
+    updateFields.push('test_date = ?')
+    params.push(testDate)
+  }
+  if (countryChecked !== undefined) {
+    updateFields.push('country_checked = ?')
+    params.push(countryChecked)
+  }
+  if (countryLocated !== undefined) {
+    updateFields.push('country_located = ?')
+    params.push(countryLocated)
+  }
+  if (frenchCardRegistration !== undefined) {
+    updateFields.push('french_card_registration = ?')
+    params.push(convertToTinyint(frenchCardRegistration))
+  }
+  if (vpnIpAddress !== undefined) {
+    updateFields.push('vpn_ip_address = ?')
+    params.push(vpnIpAddress)
+  }
+  if (ligue1ContentWhileActivated !== undefined) {
+    updateFields.push('ligue1_content_while_activated = ?')
+    params.push(convertToTinyint(ligue1ContentWhileActivated))
+  }
+  if (ligue1ContentWhileDeactivated !== undefined) {
+    updateFields.push('ligue1_content_while_deactivated = ?')
+    params.push(convertToTinyint(ligue1ContentWhileDeactivated))
+  }
+
+  // Handle screenshot upload
+  if (req.file) {
+    screenshotPath = req.file.path
+    updateFields.push('screenshot_path = ?')
+    params.push(screenshotPath)
+  }
+
+  if (updateFields.length === 0) {
+    return res.status(400).json('No fields to update')
+  }
+
+  params.push(testId)
+
+  const query = `UPDATE vpn_tests SET ${updateFields.join(', ')} WHERE id = ?`
+
+  con.query(query, params, (error, results) => {
+    if (error) {
+      res.status(500).json('Error updating VPN test: ' + error)
+      console.error('Error updating VPN test: ' + error)
+    } else {
+      if (results.affectedRows === 0) {
+        res.status(404).json({
+          message: 'VPN test not found',
+        })
+      } else {
+        res.json({
+          message: 'success',
+          result: results,
+        })
+      }
+    }
+  })
+})
+
+router.post('/vpn-tests/delete', checkAuth, (req, res) => {
+  const { testId } = req.body
+
+  // First get the test to delete the screenshot file if it exists
+  con.query('SELECT screenshot_path FROM vpn_tests WHERE id = ?', [testId], (error, results) => {
+    if (error) {
+      res.status(500).json('Error fetching VPN test: ' + error)
+      console.error('Error fetching VPN test: ' + error)
+      return
+    }
+
+    if (results.length === 0) {
+      res.status(404).json({
+        message: 'VPN test not found',
+      })
+      return
+    }
+
+    const screenshotPath = results[0].screenshot_path
+
+    // Delete the test record
+    con.query('DELETE FROM vpn_tests WHERE id = ?', [testId], (deleteError, deleteResults) => {
+      if (deleteError) {
+        res.status(500).json('Error deleting VPN test: ' + deleteError)
+        console.error('Error deleting VPN test: ' + deleteError)
+      } else {
+        // Delete the screenshot file if it exists
+        if (screenshotPath && fs.existsSync(screenshotPath)) {
+          fs.unlink(screenshotPath, (unlinkError) => {
+            if (unlinkError) {
+              console.error('Error deleting screenshot file:', unlinkError)
+            }
+          })
+        }
+
+        res.json({
+          message: 'success',
+          result: deleteResults,
+        })
+      }
+    })
+  })
+})
+
+router.post('/vpn-tests/stats', checkAuth, (req, res) => {
+  const {
+    matchday,
+    competition,
+    dateFilter,
+    countryChecked,
+    countryLocated,
+    frenchCardRegistration,
+    ligue1ContentWhileActivated,
+    testResult,
+  } = req.body
+
+  let whereConditions = ['1=1']
+  let params = []
+
+  if (matchday) {
+    whereConditions.push('matchday = ?')
+    params.push(matchday)
+  }
+
+  if (competition) {
+    whereConditions.push('competition = ?')
+    params.push(competition)
+  }
+
+  if (dateFilter && dateFilter.startDate && dateFilter.endDate) {
+    whereConditions.push('test_date BETWEEN ? AND ?')
+    params.push(dateFilter.startDate, dateFilter.endDate)
+  }
+
+  if (countryChecked) {
+    whereConditions.push('country_checked = ?')
+    params.push(countryChecked)
+  }
+
+  if (countryLocated) {
+    whereConditions.push('country_located = ?')
+    params.push(countryLocated)
+  }
+
+  if (frenchCardRegistration) {
+    whereConditions.push('french_card_registration = ?')
+    params.push(frenchCardRegistration)
+  }
+
+  if (ligue1ContentWhileActivated) {
+    whereConditions.push('ligue1_content_while_activated = ?')
+    params.push(ligue1ContentWhileActivated)
+  }
+
+  if (testResult) {
+    whereConditions.push('test_result = ?')
+    params.push(testResult)
+  }
+
+  const whereClause = whereConditions.join(' AND ')
+
+  const query = `
+    SELECT 
+      COUNT(*) as total_tests,
+      COUNT(CASE WHEN test_result = 'Success' THEN 1 END) as successful_tests,
+      COUNT(CASE WHEN test_result = 'Blocked' THEN 1 END) as blocked_tests,
+      COUNT(CASE WHEN test_result = 'Failed' THEN 1 END) as failed_tests,
+      COUNT(DISTINCT broadcaster) as unique_broadcasters,
+      COUNT(DISTINCT vpn) as unique_vpns,
+      COUNT(CASE WHEN french_card_registration = 1 THEN 1 END) as french_card_success,
+      COUNT(CASE WHEN ligue1_content_while_activated = 1 THEN 1 END) as ligue1_content_success,
+      COUNT(DISTINCT country_checked) as unique_countries_checked,
+      COUNT(DISTINCT country_located) as unique_countries_located
+    FROM vpn_tests 
+    WHERE ${whereClause}
+  `
+
+  con.query(query, params, (error, results) => {
+    if (error) {
+      res.status(500).json('Error fetching VPN test stats: ' + error)
+      console.error('Error fetching VPN test stats: ' + error)
+    } else {
+      res.json({
+        message: 'success',
+        result: results[0] || {
+          total_tests: 0,
+          successful_tests: 0,
+          blocked_tests: 0,
+          failed_tests: 0,
+          unique_broadcasters: 0,
+          unique_vpns: 0,
+        },
+      })
+    }
+  })
+})
+
+// Helper endpoint to get distinct values for debugging
+router.get('/vpn-reports/distinct-values', checkAuth, (req, res) => {
+  // Check if user is a member
+  con.query('SELECT type FROM users WHERE token = ?', [req.headers.authorization.split(' ')[1]], (error, results) => {
+    if (error || results.length === 0 || results[0].type !== 'Member') {
+      return res.status(403).json({ message: 'Access denied. Members only.' })
+    }
+
+    // Get distinct matchdays
+    con.query(
+      'SELECT DISTINCT matchday FROM vpn_tests WHERE matchday IS NOT NULL ORDER BY matchday',
+      (error, matchdays) => {
+        if (error) {
+          return res.status(500).json('Error fetching distinct matchdays: ' + error)
+        }
+
+        // Get distinct competitions
+        con.query(
+          'SELECT DISTINCT competition FROM vpn_tests WHERE competition IS NOT NULL ORDER BY competition',
+          (error, competitions) => {
+            if (error) {
+              return res.status(500).json('Error fetching distinct competitions: ' + error)
+            }
+
+            // Get distinct broadcasters
+            con.query(
+              'SELECT DISTINCT broadcaster FROM vpn_tests WHERE broadcaster IS NOT NULL ORDER BY broadcaster',
+              (error, broadcasters) => {
+                if (error) {
+                  return res.status(500).json('Error fetching distinct broadcasters: ' + error)
+                }
+
+                // Get distinct VPNs
+                con.query('SELECT DISTINCT vpn FROM vpn_tests WHERE vpn IS NOT NULL ORDER BY vpn', (error, vpns) => {
+                  if (error) {
+                    return res.status(500).json('Error fetching distinct VPNs: ' + error)
+                  }
+
+                  res.json({
+                    message: 'success',
+                    result: {
+                      matchdays: matchdays.map((m) => m.matchday),
+                      competitions: competitions.map((c) => c.competition),
+                      broadcasters: broadcasters.map((b) => b.broadcaster),
+                      vpns: vpns.map((v) => v.vpn),
+                    },
+                  })
+                })
+              }
+            )
+          }
+        )
+      }
+    )
+  })
+})
+
+/* VPN Reports - Member Only Endpoints */
+router.post('/vpn-reports/matchday', checkAuth, (req, res) => {
+  // Check if user is a member
+  con.query('SELECT type FROM users WHERE token = ?', [req.headers.authorization.split(' ')[1]], (error, results) => {
+    if (error || results.length === 0 || results[0].type !== 'Member') {
+      return res.status(403).json({ message: 'Access denied. Members only.' })
+    }
+
+    const { matchday, competition, broadcaster, vpn } = req.body
+
+    console.log('VPN Matchday Reports - Received filters:', { matchday, competition, broadcaster, vpn })
+
+    let whereConditions = ['1=1']
+    let params = []
+
+    if (matchday) {
+      whereConditions.push('vt.matchday = ?')
+      params.push(matchday)
+    }
+
+    // if (competition) {
+    //Note: only return data for Ligue 1
+    whereConditions.push('vt.competition = ?')
+    params.push('Ligue 1')
+    // }
+
+    if (broadcaster) {
+      whereConditions.push('vt.broadcaster = ?')
+      params.push(broadcaster)
+    }
+
+    if (vpn) {
+      whereConditions.push('vt.vpn = ?')
+      params.push(vpn)
+    }
+
+    const whereClause = whereConditions.join(' AND ')
+
+    const query = `
+      SELECT 
+        vt.*,
+        vt.broadcaster as broadcaster_name,
+        vt.vpn as vpn_name,
+        vt.country_checked,
+        vt.country_located,
+        vt.french_card_registration,
+        vt.vpn_ip_address,
+        vt.ligue1_content_while_activated,
+        vt.ligue1_content_while_deactivated,
+        DATE_FORMAT(vt.test_date, '%Y-%m-%d %H:%i') as formatted_date
+      FROM vpn_tests vt
+      WHERE ${whereClause}
+      ORDER BY vt.test_date DESC, vt.matchday ASC
+    `
+
+    console.log('VPN Matchday Reports - Query:', query)
+    console.log('VPN Matchday Reports - Params:', params)
+
+    con.query(query, params, (error, results) => {
+      if (error) {
+        res.status(500).json('Error fetching VPN matchday reports: ' + error)
+        console.error('Error fetching VPN matchday reports: ' + error)
+      } else {
+        console.log('VPN Matchday Reports - Results count:', results.length)
+        if (results.length > 0) {
+          console.log('VPN Matchday Reports - Sample result:', results[0])
+        }
+        res.json({
+          message: 'success',
+          result: results,
+        })
+      }
+    })
+  })
+})
+
+// Weekly VPN Reports with aggregation
+router.post('/vpn-reports/weekly', checkAuth, (req, res) => {
+  // Check if user is a member
+  con.query('SELECT type FROM users WHERE token = ?', [req.headers.authorization.split(' ')[1]], (error, results) => {
+    if (error || results.length === 0 || results[0].type !== 'Member') {
+      return res.status(403).json({ message: 'Access denied. Members only.' })
+    }
+
+    const {
+      competition,
+      broadcaster,
+      vpn,
+      dateFilter,
+      countryChecked,
+      countryLocated,
+      frenchCardRegistration,
+      ligue1ContentWhileActivated,
+      ligue1ContentWhileDeactivated,
+      testResult,
+    } = req.body
+
+    let whereConditions = ['1=1']
+    let params = []
+
+    if (competition) {
+      whereConditions.push('vt.competition = ?')
+      params.push(competition)
+    }
+
+    if (broadcaster) {
+      whereConditions.push('vt.broadcaster = ?')
+      params.push(broadcaster)
+    }
+
+    if (vpn) {
+      whereConditions.push('vt.vpn = ?')
+      params.push(vpn)
+    }
+
+    if (dateFilter && dateFilter.startDate && dateFilter.endDate) {
+      whereConditions.push('vt.test_date BETWEEN ? AND ?')
+      params.push(dateFilter.startDate, dateFilter.endDate)
+    }
+
+    if (countryChecked) {
+      whereConditions.push('vt.country_checked = ?')
+      params.push(countryChecked)
+    }
+
+    if (countryLocated) {
+      whereConditions.push('vt.country_located = ?')
+      params.push(countryLocated)
+    }
+
+    if (frenchCardRegistration) {
+      whereConditions.push('vt.french_card_registration = ?')
+      params.push(frenchCardRegistration)
+    }
+
+    if (ligue1ContentWhileActivated) {
+      whereConditions.push('vt.ligue1_content_while_activated = ?')
+      params.push(ligue1ContentWhileActivated)
+    }
+
+    if (ligue1ContentWhileDeactivated) {
+      whereConditions.push('vt.ligue1_content_while_deactivated = ?')
+      params.push(ligue1ContentWhileDeactivated)
+    }
+
+    if (testResult) {
+      whereConditions.push('vt.test_result = ?')
+      params.push(testResult)
+    }
+
+    const whereClause = whereConditions.join(' AND ')
+
+    const query = `
+      SELECT 
+        YEARWEEK(vt.test_date, 1) as period,
+        vt.broadcaster as broadcaster_name,
+        vt.vpn as vpn_name,
+        MIN(vt.test_date) as period_start,
+        MAX(vt.test_date) as period_end,
+        COUNT(*) as total_tests,
+        COUNT(CASE WHEN vt.test_result = 'Success' THEN 1 END) as successful_tests,
+        COUNT(CASE WHEN vt.test_result = 'Blocked' THEN 1 END) as blocked_tests,
+        COUNT(CASE WHEN vt.test_result = 'Failed' THEN 1 END) as failed_tests,
+        ROUND(COUNT(CASE WHEN vt.test_result = 'Success' THEN 1 END) * 100.0 / COUNT(*), 2) as success_rate
+      FROM vpn_tests vt
+      WHERE ${whereClause}
+      GROUP BY YEARWEEK(vt.test_date, 1), vt.broadcaster, vt.vpn
+      ORDER BY period DESC, broadcaster_name ASC, vpn_name ASC
+    `
+
+    con.query(query, params, (error, results) => {
+      if (error) {
+        res.status(500).json('Error fetching VPN weekly reports: ' + error)
+        console.error('Error fetching VPN weekly reports: ' + error)
+      } else {
+        res.json({
+          message: 'success',
+          result: results,
+        })
+      }
+    })
+  })
+})
+
+// Monthly VPN Reports with aggregation by broadcaster and VPN
+router.post('/vpn-reports/monthly', checkAuth, (req, res) => {
+  // Check if user is a member
+  con.query('SELECT type FROM users WHERE token = ?', [req.headers.authorization.split(' ')[1]], (error, results) => {
+    if (error || results.length === 0 || results[0].type !== 'Member') {
+      return res.status(403).json({ message: 'Access denied. Members only.' })
+    }
+
+    const {
+      competition,
+      broadcaster,
+      vpn,
+      dateFilter,
+      countryChecked,
+      countryLocated,
+      frenchCardRegistration,
+      ligue1ContentWhileActivated,
+      ligue1ContentWhileDeactivated,
+      testResult,
+    } = req.body
+
+    let whereConditions = ['1=1']
+    let params = []
+
+    if (competition) {
+      whereConditions.push('vt.competition = ?')
+      params.push(competition)
+    }
+
+    if (broadcaster) {
+      whereConditions.push('vt.broadcaster = ?')
+      params.push(broadcaster)
+    }
+
+    if (vpn) {
+      whereConditions.push('vt.vpn = ?')
+      params.push(vpn)
+    }
+
+    if (dateFilter && dateFilter.startDate && dateFilter.endDate) {
+      whereConditions.push('vt.test_date BETWEEN ? AND ?')
+      params.push(dateFilter.startDate, dateFilter.endDate)
+    }
+
+    if (countryChecked) {
+      whereConditions.push('vt.country_checked = ?')
+      params.push(countryChecked)
+    }
+
+    if (countryLocated) {
+      whereConditions.push('vt.country_located = ?')
+      params.push(countryLocated)
+    }
+
+    if (frenchCardRegistration) {
+      whereConditions.push('vt.french_card_registration = ?')
+      params.push(frenchCardRegistration)
+    }
+
+    if (ligue1ContentWhileActivated) {
+      whereConditions.push('vt.ligue1_content_while_activated = ?')
+      params.push(ligue1ContentWhileActivated)
+    }
+
+    if (ligue1ContentWhileDeactivated) {
+      whereConditions.push('vt.ligue1_content_while_deactivated = ?')
+      params.push(ligue1ContentWhileDeactivated)
+    }
+
+    if (testResult) {
+      whereConditions.push('vt.test_result = ?')
+      params.push(testResult)
+    }
+
+    const whereClause = whereConditions.join(' AND ')
+
+    const query = `
+      SELECT 
+        DATE_FORMAT(vt.test_date, '%Y-%m') as period,
+        vt.broadcaster as broadcaster_name,
+        vt.vpn as vpn_name,
+        MIN(vt.test_date) as period_start,
+        MAX(vt.test_date) as period_end,
+        COUNT(*) as total_tests,
+        COUNT(CASE WHEN vt.test_result = 'Success' THEN 1 END) as successful_tests,
+        COUNT(CASE WHEN vt.test_result = 'Blocked' THEN 1 END) as blocked_tests,
+        COUNT(CASE WHEN vt.test_result = 'Failed' THEN 1 END) as failed_tests,
+        ROUND(COUNT(CASE WHEN vt.test_result = 'Success' THEN 1 END) * 100.0 / COUNT(*), 2) as success_rate
+      FROM vpn_tests vt
+      WHERE ${whereClause}
+      GROUP BY DATE_FORMAT(vt.test_date, '%Y-%m'), vt.broadcaster, vt.vpn
+      ORDER BY period DESC, broadcaster_name ASC, vpn_name ASC
+    `
+
+    con.query(query, params, (error, results) => {
+      if (error) {
+        res.status(500).json('Error fetching VPN monthly reports: ' + error)
+        console.error('Error fetching VPN monthly reports: ' + error)
+      } else {
+        res.json({
+          message: 'success',
+          result: results,
+        })
+      }
+    })
+  })
+})
+
+// Legacy period endpoint for backward compatibility
+router.post('/vpn-reports/period', checkAuth, (req, res) => {
+  // Check if user is a member
+  con.query('SELECT type FROM users WHERE token = ?', [req.headers.authorization.split(' ')[1]], (error, results) => {
+    if (error || results.length === 0 || results[0].type !== 'Member') {
+      return res.status(403).json({ message: 'Access denied. Members only.' })
+    }
+
+    const {
+      competition,
+      broadcaster,
+      vpn,
+      dateFilter,
+      periodType,
+      countryChecked,
+      countryLocated,
+      frenchCardRegistration,
+      ligue1ContentWhileActivated,
+      ligue1ContentWhileDeactivated,
+      testResult,
+    } = req.body
+
+    let whereConditions = ['1=1']
+    let params = []
+
+    if (competition) {
+      whereConditions.push('vt.competition = ?')
+      params.push(competition)
+    }
+
+    if (broadcaster) {
+      whereConditions.push('vt.broadcaster = ?')
+      params.push(broadcaster)
+    }
+
+    if (vpn) {
+      whereConditions.push('vt.vpn = ?')
+      params.push(vpn)
+    }
+
+    if (dateFilter && dateFilter.startDate && dateFilter.endDate) {
+      whereConditions.push('vt.test_date BETWEEN ? AND ?')
+      params.push(dateFilter.startDate, dateFilter.endDate)
+    }
+
+    if (countryChecked) {
+      whereConditions.push('vt.country_checked = ?')
+      params.push(countryChecked)
+    }
+
+    if (countryLocated) {
+      whereConditions.push('vt.country_located = ?')
+      params.push(countryLocated)
+    }
+
+    if (frenchCardRegistration) {
+      whereConditions.push('vt.french_card_registration = ?')
+      params.push(frenchCardRegistration)
+    }
+
+    if (ligue1ContentWhileActivated) {
+      whereConditions.push('vt.ligue1_content_while_activated = ?')
+      params.push(ligue1ContentWhileActivated)
+    }
+
+    if (ligue1ContentWhileDeactivated) {
+      whereConditions.push('vt.ligue1_content_while_deactivated = ?')
+      params.push(ligue1ContentWhileDeactivated)
+    }
+
+    if (testResult) {
+      whereConditions.push('vt.test_result = ?')
+      params.push(testResult)
+    }
+
+    const whereClause = whereConditions.join(' AND ')
+
+    let groupBy = ''
+    let selectFields = ''
+
+    if (periodType === 'week') {
+      selectFields = `
+        YEARWEEK(vt.test_date, 1) as period,
+        MIN(vt.test_date) as period_start,
+        MAX(vt.test_date) as period_end,
+        COUNT(*) as total_tests,
+        COUNT(CASE WHEN vt.test_result = 'Success' THEN 1 END) as successful_tests,
+        COUNT(CASE WHEN vt.test_result = 'Blocked' THEN 1 END) as blocked_tests,
+        COUNT(CASE WHEN vt.test_result = 'Failed' THEN 1 END) as failed_tests
+      `
+      groupBy = 'GROUP BY YEARWEEK(vt.test_date, 1)'
+    } else {
+      selectFields = `
+        DATE_FORMAT(vt.test_date, '%Y-%m') as period,
+        vt.broadcaster as broadcaster_name,
+        MIN(vt.test_date) as period_start,
+        MAX(vt.test_date) as period_end,
+        COUNT(*) as total_tests,
+        COUNT(CASE WHEN vt.test_result = 'Success' THEN 1 END) as successful_tests,
+        COUNT(CASE WHEN vt.test_result = 'Blocked' THEN 1 END) as blocked_tests,
+        COUNT(CASE WHEN vt.test_result = 'Failed' THEN 1 END) as failed_tests
+      `
+      groupBy = 'GROUP BY DATE_FORMAT(vt.test_date, "%Y-%m"), vt.broadcaster'
+    }
+
+    const query = `
+      SELECT 
+        ${selectFields}
+      FROM vpn_tests vt
+      WHERE ${whereClause}
+      ${groupBy}
+      ORDER BY period DESC
+    `
+
+    con.query(query, params, (error, results) => {
+      if (error) {
+        res.status(500).json('Error fetching VPN period reports: ' + error)
+        console.error('Error fetching VPN period reports: ' + error)
+      } else {
+        res.json({
+          message: 'success',
+          result: results,
+        })
+      }
+    })
+  })
+})
+
+router.post('/vpn-reports/summary', checkAuth, (req, res) => {
+  // Check if user is a member
+  con.query('SELECT type FROM users WHERE token = ?', [req.headers.authorization.split(' ')[1]], (error, results) => {
+    if (error || results.length === 0 || results[0].type !== 'Member') {
+      return res.status(403).json({ message: 'Access denied. Members only.' })
+    }
+
+    const {
+      competition,
+      broadcaster,
+      vpn,
+      dateFilter,
+      countryChecked,
+      countryLocated,
+      frenchCardRegistration,
+      ligue1ContentWhileActivated,
+      ligue1ContentWhileDeactivated,
+      testResult,
+    } = req.body
+
+    let whereConditions = ['1=1']
+    let params = []
+
+    // if (competition) {
+
+    //Note: only return data for Ligue 1
+    whereConditions.push('vt.competition = ?')
+    params.push('Ligue 1')
+    // }
+
+    if (broadcaster) {
+      whereConditions.push('vt.broadcaster = ?')
+      params.push(broadcaster)
+    }
+
+    if (vpn) {
+      whereConditions.push('vt.vpn = ?')
+      params.push(vpn)
+    }
+
+    if (dateFilter && dateFilter.startDate && dateFilter.endDate) {
+      whereConditions.push('vt.test_date BETWEEN ? AND ?')
+      params.push(dateFilter.startDate, dateFilter.endDate)
+    }
+
+    if (countryChecked) {
+      whereConditions.push('vt.country_checked = ?')
+      params.push(countryChecked)
+    }
+
+    if (countryLocated) {
+      whereConditions.push('vt.country_located = ?')
+      params.push(countryLocated)
+    }
+
+    if (frenchCardRegistration) {
+      whereConditions.push('vt.french_card_registration = ?')
+      params.push(frenchCardRegistration)
+    }
+
+    if (ligue1ContentWhileActivated) {
+      whereConditions.push('vt.ligue1_content_while_activated = ?')
+      params.push(ligue1ContentWhileActivated)
+    }
+
+    if (ligue1ContentWhileDeactivated) {
+      whereConditions.push('vt.ligue1_content_while_deactivated = ?')
+      params.push(ligue1ContentWhileDeactivated)
+    }
+
+    if (testResult) {
+      whereConditions.push('vt.test_result = ?')
+      params.push(testResult)
+    }
+
+    const whereClause = whereConditions.join(' AND ')
+
+    const query = `
+      SELECT 
+        COUNT(*) as total_tests,
+        COUNT(CASE WHEN vt.test_result = 'Success' THEN 1 END) as successful_tests,
+        COUNT(CASE WHEN vt.test_result = 'Blocked' THEN 1 END) as blocked_tests,
+        COUNT(CASE WHEN vt.test_result = 'Failed' THEN 1 END) as failed_tests,
+        COUNT(DISTINCT vt.broadcaster) as unique_broadcasters,
+        COUNT(DISTINCT vt.vpn) as unique_vpns,
+        COUNT(DISTINCT vt.matchday) as unique_matchdays,
+        COUNT(CASE WHEN vt.french_card_registration = 1 THEN 1 END) as french_card_success,
+        COUNT(CASE WHEN vt.ligue1_content_while_activated = 1 THEN 1 END) as ligue1_content_success,
+        COUNT(DISTINCT vt.country_checked) as unique_countries_checked,
+        COUNT(DISTINCT vt.country_located) as unique_countries_located,
+        ROUND(COUNT(CASE WHEN vt.test_result = 'Success' THEN 1 END) * 100.0 / COUNT(*), 2) as success_rate
+      FROM vpn_tests vt
+      WHERE ${whereClause}
+    `
+
+    con.query(query, params, (error, results) => {
+      if (error) {
+        res.status(500).json('Error fetching VPN report summary: ' + error)
+        console.error('Error fetching VPN report summary: ' + error)
+      } else {
+        res.json({
+          message: 'success',
+          result: results[0] || {
+            total_tests: 0,
+            successful_tests: 0,
+            blocked_tests: 0,
+            failed_tests: 0,
+            unique_broadcasters: 0,
+            unique_vpns: 0,
+            unique_matchdays: 0,
+            success_rate: 0,
+          },
+        })
+      }
+    })
+  })
+})
+
+// API Endpoint: Get all recognized countries
+router.get('/recognized-countries', (req, res) => {
+  con.query('SELECT id, name FROM recognized_countries ORDER BY name ASC', (error, results) => {
+    if (error) {
+      res.status(500).json({ message: 'Database error', error })
+    } else {
+      res.json(results)
     }
   })
 })
