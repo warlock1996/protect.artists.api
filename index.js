@@ -184,6 +184,7 @@ function checkAuth(req, res, next) {
     } else if (results.length === 0) {
       return res.status(401).json({ message: 'Unauthorized - Invalid token' })
     } else {
+      req.user = results[0]
       next()
     }
   })
@@ -199,7 +200,7 @@ app.get('/api', (req, res) => {
 
 router.post('/user/login', async (req, res) => {
   con.query(
-    'select id, userid, name, email, type, status, image, password from users where email = ?',
+    'select id, userid, name, email, type, status, image, password, is_guest from users where email = ?',
     [req.body.email],
     (error, results) => {
       if (error) {
@@ -696,10 +697,11 @@ router.post('/members/add', checkAuth, async (req, res) => {
       const userid = crypto.randomBytes(16).toString('hex')
       const hashedPassword = await hashPassword(req.body.password)
       const token = crypto.randomBytes(64).toString('hex')
+      const isGuest = req.body.isGuest || false
 
       con.query(
-        'insert into users (userid, name, email, password, token, status) values (?,?,?,?,?,?)',
-        [userid, req.body.name, req.body.email, hashedPassword, token, 'Active'],
+        'insert into users (userid, name, email, password, token, status, is_guest) values (?,?,?,?,?,?,?)',
+        [userid, req.body.name, req.body.email, hashedPassword, token, 'Active', isGuest],
         async (error, results) => {
           if (error) {
             res.status(500).json('An error occurred: ' + error)
@@ -743,8 +745,8 @@ router.post('/members/update', (req, res) => {
     } else {
       if (results.length > 0) {
         con.query(
-          'update users set name=?, email=?, status=? where userid = ?',
-          [req.body.name, req.body.email, req.body.status, req.body.userid],
+          'update users set name=?, email=?, status=?, is_guest=? where userid = ?',
+          [req.body.name, req.body.email, req.body.status, req.body.isGuest, req.body.userid],
           (error, results) => {
             if (error) {
               res.status(500).json('An error occurred: ' + error)
@@ -844,8 +846,8 @@ router.post('/admins/add', checkAuth, async (req, res) => {
       const token = crypto.randomBytes(64).toString('hex')
 
       con.query(
-        'insert into users (userid, name, email, password, token, type, status) values (?,?,?,?,?,?,?)',
-        [userid, req.body.name, req.body.email, hashedPassword, token, 'Admin', 'Active'],
+        'insert into users (userid, name, email, password, token, type, status, is_guest) values (?,?,?,?,?,?,?,?)',
+        [userid, req.body.name, req.body.email, hashedPassword, token, 'Admin', 'Active', req.body.isGuest || false],
         async (error, results) => {
           if (error) {
             res.status(500).json('An error occurred: ' + error)
@@ -889,8 +891,8 @@ router.post('/admins/update', checkAuth, (req, res) => {
     } else {
       if (results.length > 0) {
         con.query(
-          "update users set name=?, email=?, status=? where userid = ? and type = 'Admin'",
-          [req.body.name, req.body.email, req.body.status, req.body.userid],
+          "update users set name=?, email=?, status=?, is_guest=? where userid = ? and type = 'Admin'",
+          [req.body.name, req.body.email, req.body.status, req.body.isGuest, req.body.userid],
           (error, results) => {
             if (error) {
               res.status(500).json('An error occurred: ' + error)
@@ -4338,6 +4340,147 @@ router.get('/recognized-countries', (req, res) => {
       res.status(500).json({ message: 'Database error', error })
     } else {
       res.json(results)
+    }
+  })
+})
+
+// API Endpoint: Save infringing URLs
+router.post('/infringing-urls', checkAuth, (req, res) => {
+  const { urls } = req.body
+
+  if (!urls || !urls.trim()) {
+    return res.status(400).json({ message: 'URLs are required' })
+  }
+
+  if (!req.user.id) {
+    return res.status(400).json({ message: 'User ID is required' })
+  }
+
+  // Split URLs by newlines and filter out empty ones
+  const urlList = urls
+    .split('\n')
+    .map((url) => url.trim())
+    .filter((url) => url.length > 0)
+
+  if (urlList.length === 0) {
+    return res.status(400).json({ message: 'No valid URLs provided' })
+  }
+
+  // Check for existing URLs to prevent duplicates
+  const checkQuery = 'SELECT url FROM infringing_urls WHERE url IN (?)'
+  con.query(checkQuery, [urlList], (checkError, existingResults) => {
+    if (checkError) {
+      console.error('Error checking for existing URLs:', checkError)
+      return res.status(500).json({ message: 'Failed to check for duplicates', error: checkError.message })
+    }
+
+    // Get existing URLs
+    const existingUrls = existingResults.map((row) => row.url)
+
+    // Filter out URLs that already exist
+    const newUrls = urlList.filter((url) => !existingUrls.includes(url))
+
+    if (newUrls.length === 0) {
+      return res.json({
+        message: 'All URLs already exist',
+        result: {
+          inserted: 0,
+          urls: [],
+          duplicates: urlList,
+        },
+      })
+    }
+
+    // Prepare values for batch insert with user_id (created_at will auto-generate)
+    const values = newUrls.map((url) => [url, req.user.id, new Date()])
+    const insertQuery = 'INSERT INTO infringing_urls (url, user_id, created_at) VALUES ?'
+
+    con.query(insertQuery, [values], (insertError, insertResults) => {
+      if (insertError) {
+        console.error('Error saving infringing URLs:', insertError)
+        res.status(500).json({ message: 'Failed to save URLs', error: insertError.message })
+      } else {
+        res.json({
+          message: 'success',
+          result: {
+            inserted: insertResults.affectedRows,
+            urls: newUrls,
+            duplicates: existingUrls.length > 0 ? existingUrls : undefined,
+          },
+        })
+      }
+    })
+  })
+})
+
+// API Endpoint: Get all infringing URLs with pagination
+router.get('/infringing-urls', checkAuth, (req, res) => {
+  const page = parseInt(req.query.page) || 1
+  const limit = parseInt(req.query.limit) || 10
+  const offset = (page - 1) * limit
+
+  // Get total count
+  const countQuery = `
+    SELECT COUNT(*) as total
+    FROM infringing_urls iu 
+    LEFT JOIN users u ON iu.user_id = u.id
+  `
+
+  // Get paginated results
+  const dataQuery = `
+    SELECT iu.id, iu.url, iu.created_at, u.name as user_name 
+    FROM infringing_urls iu 
+    LEFT JOIN users u ON iu.user_id = u.id 
+    ORDER BY iu.created_at DESC
+    LIMIT ? OFFSET ?
+  `
+
+  // Execute count query first
+  con.query(countQuery, (countError, countResults) => {
+    if (countError) {
+      console.error('Error counting infringing URLs:', countError)
+      return res.status(500).json({ message: 'Failed to count URLs', error: countError.message })
+    }
+
+    const total = countResults[0].total
+    const totalPages = Math.ceil(total / limit)
+
+    // Execute data query
+    con.query(dataQuery, [limit, offset], (dataError, results) => {
+      if (dataError) {
+        console.error('Error fetching infringing URLs:', dataError)
+        res.status(500).json({ message: 'Failed to fetch URLs', error: dataError.message })
+      } else {
+        res.json({
+          message: 'success',
+          urls: results,
+          pagination: {
+            currentPage: page,
+            totalPages: totalPages,
+            totalItems: total,
+            itemsPerPage: limit,
+            hasNextPage: page < totalPages,
+            hasPrevPage: page > 1,
+          },
+        })
+      }
+    })
+  })
+})
+
+router.delete('/infringing-urls/:id', checkAuth, (req, res) => {
+  const { id } = req.params
+  con.query('DELETE FROM infringing_urls WHERE id = ?', [id], (error, results) => {
+    if (error) {
+      console.error('Error deleting infringing URL:', error)
+      res.status(500).json({ message: 'Failed to delete URL', error: error.message })
+    } else {
+      res.json({
+        message: 'success',
+        result: {
+          deleted: results.affectedRows,
+        },
+      })
     }
   })
 })
